@@ -1,27 +1,25 @@
 "use client";
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, ClipboardList, CheckSquare, MoreHorizontal } from 'lucide-react';
+import { Home, BarChart3, ClipboardList, MoreHorizontal } from 'lucide-react';
+
+const navItems = [
+  { icon: Home,          label: 'Home',    path: '/' },
+  { icon: ClipboardList, label: 'Tasks',   path: '/tasks' },
+  { icon: BarChart3,     label: 'Reports', path: '/reports' },
+  { icon: MoreHorizontal,label: 'More',    path: '/more' },
+];
 
 export default function BottomNav() {
   const pathname = usePathname();
-
-  const navItems = [
-    { icon: Home, label: 'Home', path: '/' },
-    { icon: ClipboardList, label: 'Notes', path: '/notes' },
-    { icon: CheckSquare, label: 'Tasks', path: '/tasks' },
-    { icon: MoreHorizontal, label: 'More', path: '/more' },
-  ];
-
   return (
     <nav className="bottom-nav">
-      {navItems.map((item) => {
-        const Icon = item.icon;
-        const isActive = pathname === item.path;
+      {navItems.map(({ icon: Icon, label, path }) => {
+        const isActive = pathname === path || (path !== '/' && pathname.startsWith(path));
         return (
-          <Link key={item.path} href={item.path} className={`nav-item ${isActive ? 'active' : ''}`}>
-            <Icon size={20} />
-            <span>{item.label}</span>
+          <Link key={path} href={path} className={`nav-item${isActive ? ' active' : ''}`}>
+            <Icon size={22} strokeWidth={isActive ? 2.5 : 1.8} />
+            <span className="nav-label">{label}</span>
           </Link>
         );
       })}

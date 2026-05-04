@@ -7,9 +7,6 @@ import { Mic, Square, Loader2 } from 'lucide-react';
 import Header from '@/src/components/Header';
 import { analyzeNote } from '@/src/services/api';
 
-/**
- * Recording Page — Converted to Next.js
- */
 export default function RecordingPage() {
   const router = useRouter();
   const [phase, setPhase] = useState('idle'); // idle | recording | processing | error
@@ -17,24 +14,21 @@ export default function RecordingPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [analysisStatus, setAnalysisStatus] = useState('');
 
-  const {
-    transcript,
-    listening,
-    resetTranscript,
-    browserSupportsSpeechRecognition
-  } = useSpeechRecognition();
+  const { transcript, listening, resetTranscript, browserSupportsSpeechRecognition } = useSpeechRecognition();
 
+  // Timer
   useEffect(() => {
     let interval = null;
     if (phase === 'recording') {
-      interval = setInterval(() => {
-        setElapsed((prev) => prev + 1);
-      }, 1000);
+      interval = setInterval(() => setElapsed(p => p + 1), 1000);
     }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
+    return () => { if (interval) clearInterval(interval); };
   }, [phase]);
+
+  // Stop mic on unmount
+  useEffect(() => {
+    return () => SpeechRecognition.stopListening();
+  }, []);
 
   const handleStart = async () => {
     if (!browserSupportsSpeechRecognition) {
@@ -42,15 +36,15 @@ export default function RecordingPage() {
       setErrorMsg("Your browser doesn't support speech recognition.");
       return;
     }
-
     try {
       await navigator.mediaDevices.getUserMedia({ audio: true });
       resetTranscript();
+      setElapsed(0);
       setPhase('recording');
       SpeechRecognition.startListening({ continuous: true, language: 'en-US' });
     } catch (err) {
       setPhase('error');
-      setErrorMsg("Mic access denied.");
+      setErrorMsg("Mic access denied. Please allow mic in browser settings.");
     }
   };
 
@@ -58,94 +52,96 @@ export default function RecordingPage() {
     setPhase('processing');
     setAnalysisStatus('Analyzing note...');
     SpeechRecognition.stopListening();
-    
     const finalTranscript = transcript || "(No speech detected.)";
-
     try {
-      const analysisResult = await analyzeNote(finalTranscript);
-      
-      const analysisData = { 
-        transcript: finalTranscript, 
-        source: 'voice',
-        issues: analysisResult.issues,
-        analyzedAt: new Date()
-      };
-      sessionStorage.setItem('lastAnalysis', JSON.stringify(analysisData));
+      const result = await analyzeNote(finalTranscript);
+      const data = { transcript: finalTranscript, source: 'voice', issues: result.issues, analyzedAt: new Date() };
+      sessionStorage.setItem('lastAnalysis', JSON.stringify(data));
       router.push('/analysis');
     } catch (err) {
-      console.error('Analysis failed:', err);
-      const fallbackData = { 
-        transcript: finalTranscript, 
-        source: 'voice',
-        issues: []
-      };
-      sessionStorage.setItem('lastAnalysis', JSON.stringify(fallbackData));
+      const data = { transcript: finalTranscript, source: 'voice', issues: [] };
+      sessionStorage.setItem('lastAnalysis', JSON.stringify(data));
       router.push('/analysis');
     }
   };
 
-  const formatTime = (s) => {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${m}:${sec.toString().padStart(2, '0')}`;
-  };
+  const formatTime = (s) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
 
   return (
-    <div className="page-wrapper">
+    <>
       <Header showBack title="Recording" />
-
       <main className="recording-page">
+        {/* Status */}
         {phase === 'processing' ? (
           <div className="recording-status">
-             <Loader2 size={18} className="spinner" color="var(--primary)" />
-             {analysisStatus || 'Processing...'}
+            <Loader2 size={18} className="spinner" color="var(--primary)" />
+            {analysisStatus || 'Processing...'}
           </div>
         ) : phase === 'idle' ? (
           <div className="recording-status">
-            <div className="recording-dot" style={{ backgroundColor: 'var(--text-muted)' }}></div>
+            <div className="recording-dot" style={{ background: 'var(--text-muted)', boxShadow: 'none', animation: 'none' }} />
             Ready to Record
           </div>
         ) : (
           <div className="recording-status">
-            <div className="recording-dot"></div>
+            <div className="recording-dot" />
             {listening ? 'Recording...' : 'Mic Active'}
           </div>
         )}
 
+        {/* Timer */}
         <div className="recording-timer" style={{ opacity: phase === 'idle' ? 0.3 : 1 }}>
           {formatTime(elapsed)}
         </div>
 
+        {/* Error */}
         {phase === 'error' && (
-          <div style={{ color: 'var(--staffing)', marginBottom: '24px', textAlign: 'center' }}>
-            <p>{errorMsg}</p>
+          <div style={{ color: 'var(--staffing)', marginBottom: '24px', textAlign: 'center', fontSize: '0.9rem', padding: '0 24px' }}>
+            {errorMsg}
           </div>
         )}
 
+        {/* Mic / Stop / Loading button */}
         {phase === 'idle' ? (
-          <button className="stop-btn pulse" onClick={handleStart} style={{ background: 'var(--primary)', border: 'none' }}>
+          <button className="stop-btn pulse" onClick={handleStart}
+            style={{ background: 'var(--primary)', border: 'none', position: 'relative' }}>
             <Mic size={32} color="#fff" />
           </button>
         ) : phase === 'recording' ? (
           <button className="stop-btn" onClick={handleStop}>
-            <Square size={32} fill="#fff" color="#fff" />
+            <Square size={28} fill="#fff" color="#fff" />
+          </button>
+        ) : phase === 'error' ? (
+          <button className="stop-btn" onClick={() => { setPhase('idle'); setElapsed(0); }}
+            style={{ background: 'var(--primary)', border: 'none' }}>
+            <Mic size={32} color="#fff" />
           </button>
         ) : (
           <button className="stop-btn loading" disabled>
-            <Loader2 size={32} className="spinner" />
+            <Loader2 size={32} className="spinner" color="#fff" />
           </button>
         )}
 
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '16px' }}>
-          {phase === 'idle' ? 'Tap mic to start' : 
-           phase === 'recording' ? 'Tap square to stop' : 
-           'Processing...'}
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '20px', textAlign: 'center' }}>
+          {phase === 'idle' ? 'Tap mic to start' :
+           phase === 'recording' ? 'Tap to stop & analyze' :
+           phase === 'error' ? 'Tap to try again' : 'Analyzing...'}
         </p>
 
-        <div style={{ marginTop: '40px', padding: '0 30px', textAlign: 'center', opacity: 0.6, fontSize: '0.85rem' }}>
-          {transcript.length > 0 ? `"${transcript}"` : phase === 'recording' ? "Listening..." : ""}
-        </div>
+        {/* Live transcript preview */}
+        {(transcript.length > 0 || phase === 'recording') && (
+          <div style={{
+            marginTop: '40px', padding: '16px 24px',
+            background: 'var(--bg-card)', borderRadius: '16px',
+            border: '1px solid var(--border)',
+            maxWidth: '360px', width: '100%',
+            fontSize: '0.9rem', color: 'var(--text-secondary)',
+            lineHeight: 1.6, textAlign: 'center', fontStyle: 'italic'
+          }}>
+            {transcript.length > 0 ? `"${transcript}"` : 'Listening...'}
+          </div>
+        )}
       </main>
-    </div>
+    </>
   );
 }

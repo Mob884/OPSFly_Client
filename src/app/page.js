@@ -68,7 +68,7 @@ export default function Home() {
   };
 
   return (
-    <div className="page-wrapper">
+    <>
       <Header />
       
       <main className="page">
@@ -236,6 +236,6 @@ export default function Home() {
           </div>
         </section>
       </main>
-    </div>
+    </>
   );
 }

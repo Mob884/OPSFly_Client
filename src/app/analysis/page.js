@@ -67,7 +67,7 @@ export default function AnalysisPage() {
   };
 
   return (
-    <div className="page-wrapper">
+    <>
       <Header showBack title="Note Analysis" />
       
       <main className="page">
@@ -164,6 +164,6 @@ export default function AnalysisPage() {
           </button>
         </div>
       </main>
-    </div>
+    </>
   );
 }

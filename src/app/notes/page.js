@@ -26,7 +26,7 @@ export default function NotesPage() {
   };
 
   return (
-    <div className="page-wrapper">
+    <>
       <Header showBack title="All Notes" />
       
       <main className="page">
@@ -72,6 +72,6 @@ export default function NotesPage() {
           )}
         </div>
       </main>
-    </div>
+    </>
   );
 }
