@@ -1,43 +1,96 @@
 import axios from 'axios';
 
-// In Next.js, API routes are relative to the current domain
+// Directly call OpenRouter from frontend (User's request to fix production)
+const OPENROUTER_API_KEY = process.env.NEXT_PUBLIC_OPENROUTER_API_KEY || 'REDACTED_KEY';
+const BASE_URL = 'https://openrouter.ai/api/v1';
+
+const MODELS = [
+  'meta-llama/llama-3.3-70b-instruct:free',
+  'meta-llama/llama-3.2-3b-instruct:free',
+  'openai/gpt-oss-120b:free'
+];
+
+const SYSTEM_PROMPT = `You are an operations issue detector for the hospitality industry. 
+Analyze the following voice note transcript and extract all operational 
+issues mentioned.
+
+For each issue return:
+- type: category of issue (Staffing | Cost Risk | Maintenance | Other)
+- severity: (High | Medium | Low)
+- quote: the exact phrase from the transcript that triggered this issue
+- suggestedTask: a short actionable task title
+
+Return ONLY a valid JSON object in this exact format, no explanation, 
+no markdown, no extra text:
+
+{
+  "issues": [
+    {
+      "type": "Staffing",
+      "severity": "High",
+      "quote": "2 employees didn't show up this morning",
+      "suggestedTask": "Review staffing coverage"
+    }
+  ]
+}
+
+If no issues are found return: { "issues": [] }`;
+
 const api = axios.create({
   baseURL: '', 
   timeout: 60000, 
-  headers: {
-    Accept: 'application/json',
-  }
 });
 
-// Interceptor for errors
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    const message = error.response?.data?.error || error.message || 'Unknown error';
-    return Promise.reject(new Error(message));
-  }
-);
-
 /**
- * Transcribe an audio blob (Vercel note: Whisper usually needs a separate long-running server
- * but for now we call the analyze endpoint after local transcription).
- */
-export async function transcribeAudio(audioBlob) {
-  // Placeholder: actual Whisper on Vercel requires special handling
-  // For now, we rely on the browser's SpeechRecognition in the Recording page
-  return { transcript: "" };
-}
-
-/**
- * Analyze a transcript via Next.js API Route
+ * AI Analysis — Performed DIRECTLY on the client to bypass backend routing issues.
  */
 export async function analyzeNote(transcript) {
-  const response = await api.post('/api/notes/analyze', { transcript });
-  return response.data;
+  if (!transcript) return { issues: [] };
+
+  const unifiedPrompt = `${SYSTEM_PROMPT}\n\nTRANSCRIPT TO ANALYZE:\n"${transcript}"`;
+
+  for (const model of MODELS) {
+    try {
+      console.log(`[Frontend Analyzer] Attempting with model: ${model}`);
+      
+      const response = await axios.post(`${BASE_URL}/chat/completions`, {
+        model: model,
+        messages: [
+          { role: 'user', content: unifiedPrompt }
+        ]
+      }, {
+        headers: {
+          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://opsfly-client.vercel.app',
+          'X-Title': 'OpsFly'
+        },
+        timeout: 30000 
+      });
+
+      const content = response.data.choices[0].message.content;
+      
+      let jsonStr = content.replace(/<think>[\s\S]*?<\/think>/g, '');
+      jsonStr = jsonStr.replace(/```json\n?|\n?```/g, '').trim();
+      
+      const firstBrace = jsonStr.indexOf('{');
+      const lastBrace = jsonStr.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace !== -1) {
+        jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
+      }
+
+      return JSON.parse(jsonStr);
+    } catch (err) {
+      console.error(`[Frontend Analyzer] Model ${model} failed`, err);
+      continue;
+    }
+  }
+
+  return { issues: [], error: 'All AI models failed' };
 }
 
 /**
- * Save a note to the database via Next.js API Route
+ * Save a note to the database (Still calls the backend API)
  */
 export async function saveNote(data) {
   const response = await api.post('/api/notes/save', data);
