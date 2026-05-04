@@ -140,26 +140,27 @@ export default function AnalysisPage() {
           className="confirm-btn" 
           onClick={handleSave}
           disabled={isSaving}
+          style={{ marginTop: '20px' }}
         >
-          {isSaving ? <Loader2 size={18} className="spinner" /> : <FileText size={18} />}
-          {isSaving ? 'Saving...' : 'Confirm & Save'}
+          {isSaving ? <Loader2 size={20} className="spinner" /> : <CheckCircle2 size={20} />}
+          {isSaving ? 'Processing...' : 'Confirm & Save'}
         </button>
 
-        <div style={{ display: 'flex', gap: '12px', marginTop: '12px', marginBottom: '80px' }}>
+        <div style={{ display: 'flex', gap: '12px', marginTop: '12px', marginBottom: '40px' }}>
           <button 
             className="secondary-btn" 
             style={{ flex: 1 }}
             onClick={() => setIsEditing(!isEditing)}
           >
-            <Edit2 size={16} />
-            {isEditing ? 'Finish' : 'Edit Transcript'}
+            <Edit2 size={18} />
+            {isEditing ? 'Finish' : 'Edit Note'}
           </button>
           <button 
             className="secondary-btn" 
-            style={{ flex: 0, color: '#FF4D6A' }}
+            style={{ flex: 0, color: 'var(--staffing)', width: '60px' }}
             onClick={() => router.push('/')}
           >
-            <Trash2 size={16} />
+            <Trash2 size={18} />
           </button>
         </div>
       </main>

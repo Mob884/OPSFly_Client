@@ -30,9 +30,9 @@ export default function NotesPage() {
       <Header showBack title="All Notes" />
       
       <main className="page">
-        <div className="search-bar" style={{ marginBottom: '24px' }}>
-          <Search size={18} color="var(--text-muted)" />
-          <input placeholder="Search notes..." />
+        <div className="search-bar">
+          <Search size={18} color="var(--text-secondary)" />
+          <input placeholder="Search through your notes..." />
         </div>
 
         <div className="notes-list">

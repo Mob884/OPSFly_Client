@@ -93,43 +93,37 @@ export default function Home() {
           
           <div className="input-group">
             <div className="input-row">
-              {isAnalyzingText ? <Loader2 size={20} className="spinner" /> : <PenLine size={20} />}
+              {isAnalyzingText ? <Loader2 size={20} className="spinner" color="var(--primary)" /> : <PenLine size={20} />}
               <form 
                 onSubmit={handleTextSubmit}
-                style={{ flex: 1, display: 'flex', alignItems: 'center' }}
+                style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px' }}
               >
                 <input 
                   id="text-input"
-                  placeholder={isAnalyzingText ? "Analyzing..." : "Type a note"} 
+                  placeholder={isAnalyzingText ? "Analyzing..." : "Type a note..."} 
                   className="home-text-input"
                   value={textNote}
                   onChange={(e) => setTextNote(e.target.value)}
                   disabled={isAnalyzingText}
-                  style={{ 
-                    background: 'none', 
-                    border: 'none', 
-                    outline: 'none', 
-                    color: '#fff', 
-                    flex: 1,
-                    fontSize: '0.9rem',
-                    fontWeight: '500'
-                  }}
                 />
                 {textNote.trim() && !isAnalyzingText && (
                   <button 
                     type="submit"
                     style={{ 
-                      background: 'none', 
+                      background: 'var(--primary)', 
                       border: 'none', 
-                      padding: '4px',
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '50%',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: 'var(--primary)'
+                      color: '#fff',
+                      boxShadow: '0 2px 8px var(--primary-glow)'
                     }}
                   >
-                    <ChevronRight size={20} />
+                    <ChevronRight size={18} strokeWidth={3} />
                   </button>
                 )}
               </form>
