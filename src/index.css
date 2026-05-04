@@ -44,15 +44,13 @@ body {
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-/* ── Next.js Root — center the app column ───────────────────── */
-body > div {
   display: flex;
   justify-content: center;
+  align-items: flex-start;
   min-height: 100dvh;
-  background-color: #000;
 }
+
+/* Remove - was wrong target */
 
 /* ── App Shell ───────────────────────────────────────────────── */
 .page-wrapper {
