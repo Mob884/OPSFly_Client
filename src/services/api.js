@@ -1,17 +1,13 @@
 import axios from 'axios';
 
 // ── Simple in-memory cache ───────────────────────────────────────────────────
-// Notes are cached until a new note is saved or deleted, preventing unnecessary
-// network calls every time the user switches tabs.
 const cache = {
-  notes: null,       // null = not yet fetched
-  notesEtag: null,   // future: use ETag/timestamp for validation
+  notes: null,
+  tasks: null,
 };
 
-/** Call this whenever we write/delete a note so the cache is invalidated */
-export function invalidateNotesCache() {
-  cache.notes = null;
-}
+export function invalidateNotesCache() { cache.notes = null; }
+export function invalidateTasksCache() { cache.tasks = null; }
 
 // ── Axios instance ───────────────────────────────────────────────────────────
 const api = axios.create({
@@ -28,38 +24,64 @@ api.interceptors.response.use(
   }
 );
 
-// ── API Functions ────────────────────────────────────────────────────────────
+// ── Notes ────────────────────────────────────────────────────────────────────
 
-/** Analyze a transcript via the backend AI route */
 export async function analyzeNote(transcript) {
   const response = await api.post('/api/notes/analyze', { transcript });
   return response.data;
 }
 
-/** Save a note — also invalidates the cache */
+/** Save note — auto-creates tasks internally, returns { note, tasks } */
 export async function saveNote(data) {
   const response = await api.post('/api/notes/save', data);
-  invalidateNotesCache(); // force re-fetch next time
+  invalidateNotesCache();
+  invalidateTasksCache(); // tasks may have been created
   return response.data;
 }
 
-/**
- * Fetch all notes — uses in-memory cache.
- * @param {boolean} force  Pass true to skip cache and always fetch fresh data.
- */
 export async function getNotes(force = false) {
-  if (!force && cache.notes !== null) {
-    return cache.notes;
-  }
+  if (!force && cache.notes !== null) return cache.notes;
   const response = await api.get('/api/notes');
   cache.notes = response.data;
   return cache.notes;
 }
 
-/** Delete a note — also invalidates the cache */
 export async function deleteNote(id) {
   const response = await api.delete(`/api/notes/${id}`);
   invalidateNotesCache();
+  return response.data;
+}
+
+// ── Tasks ────────────────────────────────────────────────────────────────────
+
+export async function getTasks(force = false) {
+  if (!force && cache.tasks !== null) return cache.tasks;
+  const response = await api.get('/api/tasks');
+  cache.tasks = response.data;
+  return cache.tasks;
+}
+
+export async function createTask(data) {
+  const response = await api.post('/api/tasks/create', data);
+  invalidateTasksCache();
+  return response.data;
+}
+
+export async function completeTask(id) {
+  const response = await api.patch(`/api/tasks/${id}/complete`);
+  invalidateTasksCache();
+  return response.data;
+}
+
+export async function reopenTask(id) {
+  const response = await api.patch(`/api/tasks/${id}/reopen`);
+  invalidateTasksCache();
+  return response.data;
+}
+
+export async function deleteTask(id) {
+  const response = await api.delete(`/api/tasks/${id}/delete`);
+  invalidateTasksCache();
   return response.data;
 }
 
