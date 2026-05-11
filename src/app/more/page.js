@@ -28,7 +28,7 @@ export default function MorePage() {
           color: 'var(--primary)', fontWeight: '700', display: 'flex',
           alignItems: 'center', gap: '8px'
         }}>
-          <Clock size={16} /> Coming in Milestone 3
+          <Clock size={16} /> Coming in Milestone 4
         </div>
       </main>
     </div>

@@ -230,8 +230,10 @@ export default function TasksPage() {
 
   const loadTasks = useCallback(async () => {
     try {
-      // force=true on first mount to always get fresh DB state
-      const data = await getTasks(true);
+      // force=false: use the in-memory store if already populated.
+      // The store is updated in-place after every complete/reopen/delete/create,
+      // so it is always current — no need to hit the DB on every tab switch.
+      const data = await getTasks(false);
       setTasks(data);
     } catch (err) {
       console.error('Failed to load tasks', err);
