@@ -68,7 +68,7 @@ export async function getTasks(force = false) {
 
 /** Create task — prepends to cache */
 export async function createTask(data) {
-  const response = await api.post('/api/tasks/create', data);
+  const response = await api.post('/api/tasks', data);
   const newTask = response.data;
   if (store.tasks) {
     const updated = [newTask, ...store.tasks];
@@ -81,30 +81,24 @@ export async function createTask(data) {
 
 /** Mark task complete — updates cache in-place with server response */
 export async function completeTask(id) {
-  const response = await api.patch(`/api/tasks/${id}/complete`);
+  const response = await api.patch(`/api/tasks/${id}`, { action: 'complete' });
   const updated = response.data;
-  if (store.tasks) {
-    store.tasks = store.tasks.map(t => t._id === id ? updated : t);
-  }
+  if (store.tasks) store.tasks = store.tasks.map(t => t._id === id ? updated : t);
   return updated;
 }
 
 /** Reopen task — updates cache in-place with server response */
 export async function reopenTask(id) {
-  const response = await api.patch(`/api/tasks/${id}/reopen`);
+  const response = await api.patch(`/api/tasks/${id}`, { action: 'reopen' });
   const updated = response.data;
-  if (store.tasks) {
-    store.tasks = store.tasks.map(t => t._id === id ? updated : t);
-  }
+  if (store.tasks) store.tasks = store.tasks.map(t => t._id === id ? updated : t);
   return updated;
 }
 
 /** Delete task — removes from cache in-place */
 export async function deleteTask(id) {
-  const response = await api.delete(`/api/tasks/${id}/delete`);
-  if (store.tasks) {
-    store.tasks = store.tasks.filter(t => t._id !== id);
-  }
+  const response = await api.delete(`/api/tasks/${id}`);
+  if (store.tasks) store.tasks = store.tasks.filter(t => t._id !== id);
   return response.data;
 }
 
