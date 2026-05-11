@@ -1,5 +1,6 @@
 import connectDB from '@/lib/mongodb';
 import Task from '@/lib/Task';
+import '@/lib/Note'; // register Note schema so Task.populate('sourceNoteId') works
 
 /**
  * GET  /api/tasks         — fetch all tasks (sorted High → Medium → Low)
