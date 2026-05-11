@@ -1,13 +1,12 @@
 import axios from 'axios';
 
-// ── Simple in-memory cache ───────────────────────────────────────────────────
-const cache = {
-  notes: null,
+// ── Module-level store (survives tab switches in same session) ────────────────
+// Update in-place after mutations instead of nullifying, so tab switches
+// always show the correct state without waiting for a new DB round-trip.
+const store = {
+  notes: null,  // null = never fetched
   tasks: null,
 };
-
-export function invalidateNotesCache() { cache.notes = null; }
-export function invalidateTasksCache() { cache.tasks = null; }
 
 // ── Axios instance ───────────────────────────────────────────────────────────
 const api = axios.create({
@@ -31,58 +30,85 @@ export async function analyzeNote(transcript) {
   return response.data;
 }
 
-/** Save note — auto-creates tasks internally, returns { note, tasks } */
+/** Save note — also invalidates notes + tasks cache (tasks may be created) */
 export async function saveNote(data) {
   const response = await api.post('/api/notes/save', data);
-  invalidateNotesCache();
-  invalidateTasksCache(); // tasks may have been created
+  store.notes = null;  // force re-fetch
+  store.tasks = null;
   return response.data;
 }
 
+/** Fetch notes. force=true always hits DB. */
 export async function getNotes(force = false) {
-  if (!force && cache.notes !== null) return cache.notes;
+  if (!force && store.notes !== null) return store.notes;
   const response = await api.get('/api/notes');
-  cache.notes = response.data;
-  return cache.notes;
+  store.notes = response.data;
+  return store.notes;
 }
 
+/** Delete note — removes from cache in-place */
 export async function deleteNote(id) {
   const response = await api.delete(`/api/notes/${id}`);
-  invalidateNotesCache();
+  if (store.notes) store.notes = store.notes.filter(n => n._id !== id);
   return response.data;
 }
+
+// Keep backwards compat
+export function invalidateNotesCache() { store.notes = null; }
 
 // ── Tasks ────────────────────────────────────────────────────────────────────
 
+/** Fetch tasks. force=true always hits DB. */
 export async function getTasks(force = false) {
-  if (!force && cache.tasks !== null) return cache.tasks;
+  if (!force && store.tasks !== null) return store.tasks;
   const response = await api.get('/api/tasks');
-  cache.tasks = response.data;
-  return cache.tasks;
+  store.tasks = response.data;
+  return store.tasks;
 }
 
+/** Create task — prepends to cache */
 export async function createTask(data) {
   const response = await api.post('/api/tasks/create', data);
-  invalidateTasksCache();
-  return response.data;
+  const newTask = response.data;
+  if (store.tasks) {
+    const updated = [newTask, ...store.tasks];
+    const order = { High: 0, Medium: 1, Low: 2 };
+    updated.sort((a, b) => (order[a.priority] ?? 3) - (order[b.priority] ?? 3) || new Date(b.createdAt) - new Date(a.createdAt));
+    store.tasks = updated;
+  }
+  return newTask;
 }
 
+/** Mark task complete — updates cache in-place with server response */
 export async function completeTask(id) {
   const response = await api.patch(`/api/tasks/${id}/complete`);
-  invalidateTasksCache();
-  return response.data;
+  const updated = response.data;
+  if (store.tasks) {
+    store.tasks = store.tasks.map(t => t._id === id ? updated : t);
+  }
+  return updated;
 }
 
+/** Reopen task — updates cache in-place with server response */
 export async function reopenTask(id) {
   const response = await api.patch(`/api/tasks/${id}/reopen`);
-  invalidateTasksCache();
+  const updated = response.data;
+  if (store.tasks) {
+    store.tasks = store.tasks.map(t => t._id === id ? updated : t);
+  }
+  return updated;
+}
+
+/** Delete task — removes from cache in-place */
+export async function deleteTask(id) {
+  const response = await api.delete(`/api/tasks/${id}/delete`);
+  if (store.tasks) {
+    store.tasks = store.tasks.filter(t => t._id !== id);
+  }
   return response.data;
 }
 
-export async function deleteTask(id) {
-  const response = await api.delete(`/api/tasks/${id}/delete`);
-  invalidateTasksCache();
-  return response.data;
-}
+// Keep backwards compat
+export function invalidateTasksCache() { store.tasks = null; }
 
 export default api;
