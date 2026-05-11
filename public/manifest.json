@@ -1,0 +1,42 @@
+{
+  "name": "OpsFly",
+  "short_name": "OpsFly",
+  "description": "AI-powered operations intelligence for hospitality managers",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0D1B2A",
+  "theme_color": "#1D7BFF",
+  "orientation": "portrait",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Record Note",
+      "url": "/recording",
+      "description": "Record a voice note"
+    },
+    {
+      "name": "View Tasks",
+      "url": "/tasks",
+      "description": "View open tasks"
+    },
+    {
+      "name": "Daily Summary",
+      "url": "/summary",
+      "description": "View today's AI summary"
+    }
+  ]
+}

@@ -1,11 +1,12 @@
 "use client";
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, BarChart3, ClipboardList, MoreHorizontal } from 'lucide-react';
+import { Home, BarChart3, ClipboardList, CalendarDays, MoreHorizontal } from 'lucide-react';
 
 const navItems = [
   { icon: Home,          label: 'Home',    path: '/' },
   { icon: ClipboardList, label: 'Tasks',   path: '/tasks' },
+  { icon: CalendarDays,  label: 'Summary', path: '/summary' },
   { icon: BarChart3,     label: 'Reports', path: '/reports' },
   { icon: MoreHorizontal,label: 'More',    path: '/more' },
 ];

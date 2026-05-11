@@ -105,4 +105,31 @@ export async function deleteTask(id) {
 // Keep backwards compat
 export function invalidateTasksCache() { store.tasks = null; }
 
+// ── Summary (M4) ─────────────────────────────────────────────────────────────
+
+/** Fetch (or generate) today's daily summary */
+export async function getTodaySummary() {
+  const response = await api.get('/api/summary/today');
+  return response.data;
+}
+
+/** Force-regenerate today's daily summary */
+export async function generateTodaySummary() {
+  const response = await api.post('/api/summary/today');
+  return response.data;
+}
+
+/** Fetch summary for a specific date (YYYY-MM-DD) */
+export async function getSummaryByDate(date) {
+  const response = await api.get(`/api/summary/${date}`);
+  return response.data;
+}
+
+/** Fetch list of all past summaries (lightweight) */
+export async function getSummaryList() {
+  const response = await api.get('/api/summary/list');
+  return response.data;
+}
+
 export default api;
+

@@ -2,9 +2,9 @@
 import { useState, useEffect } from 'react';
 import Link from "next/link";
 import { useRouter } from 'next/navigation';
-import { Mic, PenLine, Camera, Users, DollarSign, Wrench, AlertTriangle, ClipboardCheck, ChevronRight, Loader2 } from 'lucide-react';
+import { Mic, PenLine, Camera, Users, DollarSign, Wrench, AlertTriangle, ClipboardCheck, ChevronRight, Loader2, CalendarDays, BarChart3 } from 'lucide-react';
 import Header from '@/src/components/Header';
-import { getNotes, getTasks, analyzeNote } from '@/src/services/api';
+import { getNotes, getTasks, analyzeNote, getTodaySummary } from '@/src/services/api';
 
 const ISSUE_ICONS = {
   Staffing: <Users size={15} />,
@@ -21,6 +21,7 @@ const PRIORITY_CONFIG = {
 export default function Home() {
   const [notes, setNotes] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [summary, setSummary] = useState(null);
   const [textNote, setTextNote] = useState('');
   const [loading, setLoading] = useState(true);
   const [isAnalyzingText, setIsAnalyzingText] = useState(false);
@@ -32,6 +33,8 @@ export default function Home() {
         const [notesData, tasksData] = await Promise.all([getNotes(), getTasks()]);
         setNotes(notesData.slice(0, 5));
         setTasks(tasksData.filter(t => t.status === 'open').slice(0, 3));
+        // Load today's summary in background (non-blocking)
+        getTodaySummary().then(setSummary).catch(() => {});
       } catch (err) {
         console.error('Failed to load data', err);
       } finally {
@@ -108,7 +111,7 @@ export default function Home() {
             </div>
             <div className="input-row" style={{ opacity: 0.4 }}>
               <Camera size={20} />
-              <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>Add Photo (M4)</span>
+              <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>Add Photo (M5)</span>
             </div>
           </div>
         </div>
@@ -202,6 +205,54 @@ export default function Home() {
             )}
           </div>
         </section>
+
+        {/* Daily Summary card */}
+        <section>
+          <div className="section-head">
+            <h3>Daily Summary</h3>
+            <Link href="/summary" className="view-all">View full</Link>
+          </div>
+          <Link href="/summary" style={{ textDecoration: 'none' }}>
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(29,123,255,0.15) 0%, rgba(29,123,255,0.05) 100%)',
+              border: '1px solid rgba(29,123,255,0.25)',
+              borderRadius: 18, padding: '18px',
+              display: 'flex', alignItems: 'center', gap: 16,
+              cursor: 'pointer', transition: 'all 0.2s',
+            }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: 14, flexShrink: 0,
+                background: 'rgba(29,123,255,0.15)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <CalendarDays size={24} color="var(--primary)" />
+              </div>
+              <div style={{ flex: 1 }}>
+                {summary ? (
+                  <>
+                    <p style={{ fontWeight: 800, fontSize: '0.95rem', color: '#fff', marginBottom: 4 }}>
+                      {summary.totalIssues} issue{summary.totalIssues !== 1 ? 's' : ''} detected today
+                    </p>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                      {summary.keyConcerns?.[0] || 'Tap to view AI summary'}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p style={{ fontWeight: 800, fontSize: '0.95rem', color: '#fff', marginBottom: 4 }}>
+                      Today's Summary
+                    </p>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                      AI-generated overview of today's operations
+                    </p>
+                  </>
+                )}
+              </div>
+              <ChevronRight size={20} color="var(--primary)" />
+            </div>
+          </Link>
+        </section>
+
       </main>
     </>
   );
