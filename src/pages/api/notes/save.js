@@ -1,16 +1,19 @@
 import connectDB from '@/lib/mongodb';
 import Note from '@/lib/Note';
 import Task from '@/lib/Task';
+import { authMiddleware } from '@/lib/auth';
 
 /**
  * POST /api/notes/save
  * Saves the note, then auto-creates a Task for each detected issue.
- * // M4: tasks will appear in daily summary
  */
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
   try {
     await connectDB();
+
+    const decoded = await authMiddleware(req, res);
+    if (!decoded) return;
 
     const { transcript, source, issues = [], analyzedAt } = req.body;
 
@@ -18,15 +21,16 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'transcript is required' });
     }
 
-    // 1. Save the note
+    // 1. Save the note with the creator's userId
     const note = await Note.create({
       transcript: transcript.trim(),
       source: source || 'voice',
       issues,
       analyzedAt: analyzedAt || new Date(),
+      userId: decoded.userId,
     });
 
-    // 2. Auto-create tasks from issues (if any)
+    // 2. Auto-create tasks from issues (if any) with the creator's userId
     const createdTasks = [];
     if (issues.length > 0) {
       const dueDate = new Date();
@@ -45,6 +49,7 @@ export default async function handler(req, res) {
           sourceNoteId: note._id,
           sourceIssueType: issue.type,
           dueDate,
+          userId: decoded.userId,
         });
         createdTasks.push(task);
       }

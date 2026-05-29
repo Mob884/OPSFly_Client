@@ -1,6 +1,7 @@
 import connectDB from '@/lib/mongodb';
 import Task from '@/lib/Task';
 import '@/lib/Note'; // register Note schema so Task.populate('sourceNoteId') works
+import { authMiddleware } from '@/lib/auth';
 
 /**
  * GET  /api/tasks         — fetch all tasks (sorted High → Medium → Low)
@@ -9,10 +10,18 @@ import '@/lib/Note'; // register Note schema so Task.populate('sourceNoteId') wo
 export default async function handler(req, res) {
   await connectDB();
 
+  const decoded = await authMiddleware(req, res);
+  if (!decoded) return;
+
   // ── GET all tasks ──────────────────────────────────────────────────────────
   if (req.method === 'GET') {
     try {
-      const tasks = await Task.find()
+      let query = {};
+      if (decoded.role !== 'Manager') {
+        query = { userId: decoded.userId };
+      }
+
+      const tasks = await Task.find(query)
         .populate('sourceNoteId', 'transcript createdAt')
         .lean();
 
@@ -43,6 +52,7 @@ export default async function handler(req, res) {
         sourceNoteId: sourceNoteId || null,
         sourceIssueType: sourceIssueType || null,
         dueDate,
+        userId: decoded.userId,
       });
       return res.status(201).json(task);
     } catch (err) {

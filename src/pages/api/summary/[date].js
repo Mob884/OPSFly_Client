@@ -1,6 +1,7 @@
 import { generateDailySummary, startOfDay } from '@/lib/summaryGenerator';
 import connectDB from '@/lib/mongodb';
 import DailySummary from '@/lib/DailySummary';
+import { authMiddleware } from '@/lib/auth';
 
 /**
  * GET /api/summary/[date]
@@ -12,12 +13,18 @@ export default async function handler(req, res) {
   const { date } = req.query;
 
   try {
+    await connectDB();
+    const decoded = await authMiddleware(req, res);
+    if (!decoded) return;
+
+    if (decoded.role !== 'Manager') {
+      return res.status(403).json({ error: 'Access denied. Only Managers can view operation summaries.' });
+    }
+
     const parsed = new Date(date);
     if (isNaN(parsed.getTime())) {
       return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
     }
-
-    await connectDB();
 
     // Try to find existing summary first
     const existing = await DailySummary.findOne({ date: startOfDay(parsed) }).lean();

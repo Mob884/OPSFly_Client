@@ -1,5 +1,6 @@
 import connectDB from '@/lib/mongodb';
 import DailySummary from '@/lib/DailySummary';
+import { authMiddleware } from '@/lib/auth';
 
 /**
  * GET /api/summary/list
@@ -10,6 +11,13 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end();
   try {
     await connectDB();
+    const decoded = await authMiddleware(req, res);
+    if (!decoded) return;
+
+    if (decoded.role !== 'Manager') {
+      return res.status(403).json({ error: 'Access denied. Only Managers can view operation report lists.' });
+    }
+
     const summaries = await DailySummary.find()
       .select('date totalIssues totalTasks completedTasks generatedAt')
       .sort({ date: -1 })

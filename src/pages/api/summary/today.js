@@ -1,4 +1,5 @@
 import { generateDailySummary } from '@/lib/summaryGenerator';
+import { authMiddleware } from '@/lib/auth';
 
 /**
  * GET  /api/summary/today  — fetch (or generate) today's summary
@@ -9,6 +10,13 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
   try {
+    const decoded = await authMiddleware(req, res);
+    if (!decoded) return;
+
+    if (decoded.role !== 'Manager') {
+      return res.status(403).json({ error: 'Access denied. Only Managers can view or generate operation summaries.' });
+    }
+
     const summary = await generateDailySummary(new Date());
     return res.status(200).json(summary);
   } catch (err) {

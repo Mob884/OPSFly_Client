@@ -1,5 +1,6 @@
 import connectDB from '@/lib/mongodb';
 import Task from '@/lib/Task';
+import { authMiddleware } from '@/lib/auth';
 
 /**
  * Single handler for all task-specific operations.
@@ -19,54 +20,48 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Database connection failed' });
   }
 
-  // ── PATCH — complete or reopen ─────────────────────────────────────────────
-  if (req.method === 'PATCH') {
-    const { action } = req.body || {};
+  const decoded = await authMiddleware(req, res);
+  if (!decoded) return;
 
-    if (action === 'complete') {
-      try {
-        const task = await Task.findByIdAndUpdate(
-          id,
-          { status: 'completed', completedAt: new Date() },
-          { new: true }
-        );
-        if (!task) return res.status(404).json({ error: 'Task not found' });
-        return res.json(task);
-      } catch (err) {
-        console.error('[PATCH complete]', err);
-        return res.status(500).json({ error: 'Failed to complete task' });
-      }
+  try {
+    const task = await Task.findById(id);
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+
+    // Restrict access: non-Managers can only modify/delete their own tasks
+    if (decoded.role !== 'Manager' && String(task.userId) !== String(decoded.userId)) {
+      return res.status(403).json({ error: 'Forbidden. You do not have permission to manage this task.' });
     }
 
-    if (action === 'reopen') {
-      try {
-        const task = await Task.findByIdAndUpdate(
-          id,
-          { status: 'open', completedAt: null },
-          { new: true }
-        );
-        if (!task) return res.status(404).json({ error: 'Task not found' });
+    // ── PATCH — complete or reopen ─────────────────────────────────────────────
+    if (req.method === 'PATCH') {
+      const { action } = req.body || {};
+
+      if (action === 'complete') {
+        task.status = 'completed';
+        task.completedAt = new Date();
+        await task.save();
         return res.json(task);
-      } catch (err) {
-        console.error('[PATCH reopen]', err);
-        return res.status(500).json({ error: 'Failed to reopen task' });
       }
+
+      if (action === 'reopen') {
+        task.status = 'open';
+        task.completedAt = null;
+        await task.save();
+        return res.json(task);
+      }
+
+      return res.status(400).json({ error: 'Invalid action. Use "complete" or "reopen".' });
     }
 
-    return res.status(400).json({ error: 'Invalid action. Use "complete" or "reopen".' });
-  }
-
-  // ── DELETE ─────────────────────────────────────────────────────────────────
-  if (req.method === 'DELETE') {
-    try {
-      const task = await Task.findByIdAndDelete(id);
-      if (!task) return res.status(404).json({ error: 'Task not found' });
+    // ── DELETE ─────────────────────────────────────────────────────────────────
+    if (req.method === 'DELETE') {
+      await task.deleteOne();
       return res.json({ success: true });
-    } catch (err) {
-      console.error('[DELETE task]', err);
-      return res.status(500).json({ error: 'Failed to delete task' });
     }
-  }
 
-  return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(405).json({ error: 'Method not allowed' });
+  } catch (err) {
+    console.error('[task operation error]', err);
+    return res.status(500).json({ error: 'Failed to process task operation' });
+  }
 }

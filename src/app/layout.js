@@ -1,8 +1,10 @@
 import { Inter } from 'next/font/google';
 import '../index.css';
-import BottomNav from '@/src/components/BottomNav';
+import { AuthProvider } from '@/src/context/AuthContext';
+import AppLayoutContent from '@/src/components/AppLayoutContent';
 
 const inter = Inter({ subsets: ['latin'] });
+
 
 export const metadata = {
   title: 'OpsFly',
@@ -67,10 +69,11 @@ export default function RootLayout({ children }) {
         />
       </head>
       <body className={inter.className}>
-        <div className="page-wrapper">
-          {children}
-          <BottomNav />
-        </div>
+        <AuthProvider>
+          <AppLayoutContent>
+            {children}
+          </AppLayoutContent>
+        </AuthProvider>
       </body>
     </html>
   );

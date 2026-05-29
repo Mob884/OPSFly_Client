@@ -2,20 +2,31 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, BarChart3, ClipboardList, CalendarDays, MoreHorizontal } from 'lucide-react';
+import { useAuth } from '@/src/context/AuthContext';
 
-const navItems = [
+const allNavItems = [
   { icon: Home,          label: 'Home',    path: '/' },
   { icon: ClipboardList, label: 'Tasks',   path: '/tasks' },
-  { icon: CalendarDays,  label: 'Summary', path: '/summary' },
-  { icon: BarChart3,     label: 'Reports', path: '/reports' },
+  { icon: CalendarDays,  label: 'Summary', path: '/summary', managerOnly: true },
+  { icon: BarChart3,     label: 'Reports', path: '/reports', managerOnly: true },
   { icon: MoreHorizontal,label: 'More',    path: '/more' },
 ];
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const { user } = useAuth();
+
+  // Filter navigation items: if user is Staff, hide managerOnly routes
+  const filteredNavItems = allNavItems.filter(item => {
+    if (item.managerOnly && user?.role !== 'Manager') {
+      return false;
+    }
+    return true;
+  });
+
   return (
     <nav className="bottom-nav">
-      {navItems.map(({ icon: Icon, label, path }) => {
+      {filteredNavItems.map(({ icon: Icon, label, path }) => {
         const isActive = pathname === path || (path !== '/' && pathname.startsWith(path));
         return (
           <Link key={path} href={path} className={`nav-item${isActive ? ' active' : ''}`}>
