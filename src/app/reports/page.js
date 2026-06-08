@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import Header from '@/src/components/Header';
 import { getSummaryList } from '@/src/services/api';
+import { useAuth } from '@/src/context/AuthContext';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function toYMD(d) {
@@ -102,6 +103,7 @@ function GroupHeader({ label, totalIssues, totalTasks }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function ReportsPage() {
+  const { currentLocationId } = useAuth();
   const router = useRouter();
   const [tab, setTab]         = useState('daily');
   const [summaries, setSummaries] = useState([]);
@@ -109,11 +111,13 @@ export default function ReportsPage() {
   const [error, setError]     = useState('');
 
   useEffect(() => {
+    if (!currentLocationId) return;
+    setLoading(true);
     getSummaryList()
       .then(setSummaries)
       .catch(() => setError('Could not load reports.'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [currentLocationId]);
 
   const openSummary = (item) => {
     router.push(`/summary?date=${toYMD(item.date)}`);

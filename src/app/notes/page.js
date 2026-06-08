@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Search, Loader2, Calendar, Trash2, FileText, X, CheckSquare, Square } from 'lucide-react';
 import Header from '@/src/components/Header';
 import { getNotes, deleteNote, invalidateNotesCache } from '@/src/services/api';
+import { useAuth } from '@/src/context/AuthContext';
 
 const SEVERITY_COLORS = {
   staffing:    { bg: 'rgba(239,68,68,0.12)',  color: '#EF4444' },
@@ -15,6 +16,7 @@ function issueStyle(type = '') {
 }
 
 export default function NotesPage() {
+  const { currentLocationId } = useAuth();
   const [notes, setNotes]         = useState([]);
   const [loading, setLoading]     = useState(true);
   const [query, setQuery]         = useState('');
@@ -24,11 +26,13 @@ export default function NotesPage() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
   useEffect(() => {
+    if (!currentLocationId) return;
+    setLoading(true);
     getNotes(true)
       .then(setNotes)
       .catch(err => console.error('Failed to fetch notes', err))
       .finally(() => setLoading(false));
-  }, []);
+  }, [currentLocationId]);
 
   const filtered = useMemo(() => {
     if (!query.trim()) return notes;

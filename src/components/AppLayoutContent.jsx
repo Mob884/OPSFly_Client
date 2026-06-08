@@ -16,6 +16,7 @@ export default function AppLayoutContent({ children }) {
   useEffect(() => {
     if (loading) return;
 
+    const MANAGER_ROLES = ['owner', 'district_manager', 'gm', 'agm', 'department_manager', 'Manager'];
     const isPublic = PUBLIC_ROUTES.includes(pathname);
     const isManagerOnly = MANAGER_ONLY_ROUTES.some(route => pathname === route || pathname.startsWith(route));
 
@@ -28,7 +29,7 @@ export default function AppLayoutContent({ children }) {
       // If logged in, prevent visiting login/register
       if (isPublic) {
         router.push('/');
-      } else if (isManagerOnly && user?.role !== 'Manager') {
+      } else if (isManagerOnly && !MANAGER_ROLES.includes(user?.role)) {
         // Enforce RBAC: Non-managers cannot visit manager-only pages
         router.push('/');
       }
@@ -63,7 +64,8 @@ export default function AppLayoutContent({ children }) {
 
   // If authenticated but visiting restricted page, prevent brief flashes
   const isManagerPage = MANAGER_ONLY_ROUTES.some(route => pathname === route || pathname.startsWith(route));
-  if (isAuthenticated && isManagerPage && user?.role !== 'Manager') {
+  const MANAGER_ROLES = ['owner', 'district_manager', 'gm', 'agm', 'department_manager', 'Manager'];
+  if (isAuthenticated && isManagerPage && !MANAGER_ROLES.includes(user?.role)) {
     return (
       <div style={{
         display: 'flex', minHeight: '100dvh', backgroundColor: '#050B14'

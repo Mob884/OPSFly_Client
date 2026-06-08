@@ -16,9 +16,10 @@ export default function BottomNav() {
   const pathname = usePathname();
   const { user } = useAuth();
 
-  // Filter navigation items: if user is Staff, hide managerOnly routes
+  // Filter navigation items: if user is not in manager roles, hide managerOnly routes
   const filteredNavItems = allNavItems.filter(item => {
-    if (item.managerOnly && user?.role !== 'Manager') {
+    const MANAGER_ROLES = ['owner', 'district_manager', 'gm', 'agm', 'department_manager', 'Manager'];
+    if (item.managerOnly && !MANAGER_ROLES.includes(user?.role)) {
       return false;
     }
     return true;

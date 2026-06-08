@@ -3,10 +3,12 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Users, DollarSign, Wrench, AlertTriangle,
   CheckCircle2, RotateCcw, Trash2, Plus,
-  Loader2, ClipboardList, X, ChevronDown
+  Loader2, ClipboardList, X, ChevronDown, UserCheck
 } from 'lucide-react';
 import Header from '@/src/components/Header';
-import { getTasks, createTask, completeTask, reopenTask, deleteTask } from '@/src/services/api';
+import { getTasks, createTask, completeTask, reopenTask, deleteTask, assignTask } from '@/src/services/api';
+import { useAuth } from '@/src/context/AuthContext';
+import axios from 'axios';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const PRIORITY_CONFIG = {
@@ -31,11 +33,14 @@ function formatDue(date) {
 }
 
 // ── TaskCard ──────────────────────────────────────────────────────────────────
-function TaskCard({ task, onComplete, onReopen, onDelete, actionPending }) {
+function TaskCard({ task, userRole, onComplete, onReopen, onDelete, onOpenAssign, actionPending }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const cfg = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.Medium;
   const done = task.status === 'completed';
   const loading = actionPending === task._id;
+
+  // Only owner, district_manager, gm, agm can assign tasks
+  const canAssign = ['owner', 'district_manager', 'gm', 'agm', 'Manager'].includes(userRole);
 
   return (
     <div style={{
@@ -64,7 +69,7 @@ function TaskCard({ task, onComplete, onReopen, onDelete, actionPending }) {
           marginBottom: 6,
         }}>{task.title}</div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
           <span style={{
             fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase',
             padding: '2px 8px', borderRadius: 4,
@@ -88,6 +93,33 @@ function TaskCard({ task, onComplete, onReopen, onDelete, actionPending }) {
             </span>
           )}
         </div>
+
+        {/* Assignment details */}
+        {(task.assignedTo || task.assignedBy) && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
+            {task.assignedTo && (
+              <span style={{
+                fontSize: '0.7rem',
+                fontWeight: '800',
+                background: 'rgba(29, 123, 255, 0.1)',
+                color: 'var(--primary)',
+                padding: '2px 8px',
+                borderRadius: '6px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
+                <Users size={11} />
+                Assigned to: {task.assignedTo.name}
+              </span>
+            )}
+            {task.assignedBy && (
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                assigned by {task.assignedBy.name}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Action menu */}
@@ -119,6 +151,11 @@ function TaskCard({ task, onComplete, onReopen, onDelete, actionPending }) {
                   <CheckCircle2 size={14} /> Mark Complete
                 </button>
               )}
+              {canAssign && (
+                <button className="menu-item" onClick={() => { onOpenAssign(task); setMenuOpen(false); }}>
+                  <UserCheck size={14} /> Assign Task
+                </button>
+              )}
               <button className="menu-item red" onClick={() => { onDelete(task._id); setMenuOpen(false); }}>
                 <Trash2 size={14} /> Delete Task
               </button>
@@ -131,11 +168,14 @@ function TaskCard({ task, onComplete, onReopen, onDelete, actionPending }) {
 }
 
 // ── Add Task Modal ─────────────────────────────────────────────────────────────
-function AddTaskModal({ onClose, onSave }) {
+function AddTaskModal({ onClose, onSave, users, userRole }) {
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState('Medium');
+  const [assignedTo, setAssignedTo] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  const canAssign = ['owner', 'district_manager', 'gm', 'agm', 'Manager'].includes(userRole);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -143,7 +183,7 @@ function AddTaskModal({ onClose, onSave }) {
     setSaving(true);
     setError('');
     try {
-      await onSave({ title: title.trim(), priority });
+      await onSave({ title: title.trim(), priority, assignedTo: assignedTo || undefined });
       onClose();
     } catch (err) {
       setError('Failed to create task. Please try again.');
@@ -162,7 +202,7 @@ function AddTaskModal({ onClose, onSave }) {
         borderRadius: '24px 24px 0 0', padding: '24px 24px 40px',
         border: '1px solid var(--border)',
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h3 style={{ fontWeight: 800, fontSize: '1.1rem' }}>Add Task</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
             <X size={20} />
@@ -207,6 +247,29 @@ function AddTaskModal({ onClose, onSave }) {
             </div>
           </div>
 
+          {canAssign && (
+            <div>
+              <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>
+                Assign To (Optional)
+              </label>
+              <select
+                value={assignedTo}
+                onChange={e => setAssignedTo(e.target.value)}
+                style={{
+                  width: '100%', background: 'var(--bg-card-alt)',
+                  border: '1px solid var(--border)', borderRadius: 12,
+                  padding: '12px 16px', color: '#fff', fontSize: '0.95rem',
+                  outline: 'none', fontFamily: 'inherit',
+                }}
+              >
+                <option value="">Unassigned</option>
+                {users.map(u => (
+                  <option key={u._id} value={u._id}>{u.name} ({u.role.replace('_', ' ')})</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {error && <p style={{ color: '#EF4444', fontSize: '0.85rem' }}>{error}</p>}
 
           <button type="submit" disabled={!title.trim() || saving} className="confirm-btn" style={{ marginTop: 4 }}>
@@ -219,21 +282,116 @@ function AddTaskModal({ onClose, onSave }) {
   );
 }
 
+// ── Assign Task Picker Modal ────────────────────────────────────────────────────
+function AssignTaskModal({ task, users, onClose, onAssign }) {
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+      onClick={onClose}
+    >
+      <div onClick={e => e.stopPropagation()} style={{
+        width: '100%', maxWidth: 400, background: '#0D1520',
+        borderRadius: '24px', padding: '24px',
+        border: '1px solid var(--border)',
+        boxShadow: '0 12px 48px rgba(0,0,0,0.6)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 16
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ fontWeight: 850, fontSize: '1.1rem', color: '#fff' }}>Assign Task</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+            <X size={20} />
+          </button>
+        </div>
+
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: -6 }}>
+          Select a location team member to assign this task:
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '250px', overflowY: 'auto', paddingRight: '4px' }}>
+          {users.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', textAlign: 'center', padding: '16px' }}>
+              No location members available.
+            </p>
+          ) : (
+            users.map(u => {
+              const active = task.assignedTo?._id === u._id;
+              return (
+                <button
+                  key={u._id}
+                  onClick={() => {
+                    onAssign(task._id, u._id);
+                    onClose();
+                  }}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    width: '100%',
+                    padding: '12px 16px',
+                    borderRadius: '12px',
+                    border: `1px solid ${active ? 'var(--primary)' : 'var(--border)'}`,
+                    background: active ? 'rgba(29, 123, 255, 0.08)' : 'var(--bg-card)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    textAlign: 'left'
+                  }}
+                >
+                  <span style={{ fontWeight: 750, color: '#fff', fontSize: '0.9rem' }}>{u.name}</span>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '2px', textTransform: 'capitalize' }}>
+                    {u.role.replace('_', ' ')} {u.department ? `• ${u.department}` : ''}
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        {task.assignedTo && (
+          <button
+            onClick={() => {
+              onAssign(task._id, null);
+              onClose();
+            }}
+            style={{
+              width: '100%',
+              padding: '12px',
+              borderRadius: '12px',
+              border: '1px solid rgba(255, 77, 106, 0.3)',
+              background: 'rgba(255, 77, 106, 0.08)',
+              color: 'var(--staffing)',
+              fontWeight: 800,
+              fontSize: '0.88rem',
+              cursor: 'pointer',
+              transition: 'background 0.2s'
+            }}
+          >
+            Clear Assignment
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Tasks Page ─────────────────────────────────────────────────────────────────
 export default function TasksPage() {
+  const { user, currentLocationId } = useAuth();
   const [tasks, setTasks]       = useState([]);
+  const [users, setUsers]       = useState([]);
   const [loading, setLoading]   = useState(true);
   const [tab, setTab]           = useState('open');
   const [showModal, setShowModal] = useState(false);
+  const [assignTargetTask, setAssignTargetTask] = useState(null);
   const [actionPending, setActionPending] = useState(null); // task id being mutated
   const [error, setError]       = useState('');
 
   const loadTasks = useCallback(async () => {
+    if (!currentLocationId) return;
     try {
-      // force=false: use the in-memory store if already populated.
-      // The store is updated in-place after every complete/reopen/delete/create,
-      // so it is always current — no need to hit the DB on every tab switch.
-      const data = await getTasks(false);
+      setLoading(true);
+      const data = await getTasks(true); // force re-fetch from backend scoped by location
       setTasks(data);
     } catch (err) {
       console.error('Failed to load tasks', err);
@@ -241,22 +399,40 @@ export default function TasksPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentLocationId]);
 
-  useEffect(() => { loadTasks(); }, [loadTasks]);
+  const loadUsers = useCallback(async () => {
+    if (!currentLocationId) return;
+    try {
+      const storedToken = localStorage.getItem('opsfly_token');
+      const res = await axios.get('/api/users', {
+        headers: { Authorization: `Bearer ${storedToken}` }
+      });
+      // Filter users list to show only those belonging to the active location (if not filtered by backend)
+      const list = res.data || [];
+      const localUsers = list.filter(u => 
+        u.locationIds?.includes(currentLocationId)
+      );
+      setUsers(localUsers.length > 0 ? localUsers : list);
+    } catch (err) {
+      console.warn('Failed to load users for assignment', err);
+    }
+  }, [currentLocationId]);
+
+  useEffect(() => {
+    loadTasks();
+    loadUsers();
+  }, [loadTasks, loadUsers]);
 
   // ── Complete — with rollback on failure ──────────────────────────────────
   const handleComplete = async (id) => {
     const prev = tasks;
     setActionPending(id);
-    // Optimistic update
     setTasks(t => t.map(x => x._id === id ? { ...x, status: 'completed', completedAt: new Date() } : x));
     try {
-      const updated = await completeTask(id); // updates store in-place
-      // Replace optimistic with server response (has real completedAt, _id, etc.)
+      const updated = await completeTask(id);
       setTasks(t => t.map(x => x._id === id ? updated : x));
     } catch (err) {
-      // Rollback
       setTasks(prev);
       setError('Failed to complete task. Please try again.');
       setTimeout(() => setError(''), 3000);
@@ -292,6 +468,22 @@ export default function TasksPage() {
     } catch (err) {
       setTasks(prev);
       setError('Failed to delete task. Please try again.');
+      setTimeout(() => setError(''), 3000);
+    } finally {
+      setActionPending(null);
+    }
+  };
+
+  // ── Assign — with rollback ───────────────────────────────────────────────
+  const handleAssign = async (taskId, assignedToUserId) => {
+    const prev = tasks;
+    setActionPending(taskId);
+    try {
+      const updated = await assignTask(taskId, assignedToUserId);
+      setTasks(t => t.map(x => x._id === taskId ? updated : x));
+    } catch (err) {
+      setTasks(prev);
+      setError('Failed to assign task. Please try again.');
       setTimeout(() => setError(''), 3000);
     } finally {
       setActionPending(null);
@@ -370,7 +562,7 @@ export default function TasksPage() {
               <div style={{ textAlign: 'center', padding: '60px 24px', background: 'var(--bg-card)', borderRadius: 20, border: '1px solid var(--border)' }}>
                 <ClipboardList size={40} color="var(--text-muted)" style={{ marginBottom: 12 }} />
                 <p style={{ fontWeight: 700, marginBottom: 6 }}>All clear!</p>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No open tasks. Record a note to auto-generate tasks.</p>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No open tasks. Looking good!</p>
               </div>
             ) : (
               ['High', 'Medium', 'Low'].map(priority => {
@@ -388,7 +580,16 @@ export default function TasksPage() {
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {group.map(task => (
-                        <TaskCard key={task._id} task={task} onComplete={handleComplete} onReopen={handleReopen} onDelete={handleDelete} actionPending={actionPending} />
+                        <TaskCard
+                          key={task._id}
+                          task={task}
+                          userRole={user?.role}
+                          onComplete={handleComplete}
+                          onReopen={handleReopen}
+                          onDelete={handleDelete}
+                          onOpenAssign={setAssignTargetTask}
+                          actionPending={actionPending}
+                        />
                       ))}
                     </div>
                   </div>
@@ -408,7 +609,16 @@ export default function TasksPage() {
               </div>
             ) : (
               completedTasks.map(task => (
-                <TaskCard key={task._id} task={task} onComplete={handleComplete} onReopen={handleReopen} onDelete={handleDelete} actionPending={actionPending} />
+                <TaskCard
+                  key={task._id}
+                  task={task}
+                  userRole={user?.role}
+                  onComplete={handleComplete}
+                  onReopen={handleReopen}
+                  onDelete={handleDelete}
+                  onOpenAssign={setAssignTargetTask}
+                  actionPending={actionPending}
+                />
               ))
             )}
           </div>
@@ -432,7 +642,23 @@ export default function TasksPage() {
         <Plus size={20} /> Add Task
       </button>
 
-      {showModal && <AddTaskModal onClose={() => setShowModal(false)} onSave={handleAddTask} />}
+      {showModal && (
+        <AddTaskModal
+          onClose={() => setShowModal(false)}
+          onSave={handleAddTask}
+          users={users}
+          userRole={user?.role}
+        />
+      )}
+
+      {assignTargetTask && (
+        <AssignTaskModal
+          task={assignTargetTask}
+          users={users}
+          onClose={() => setAssignTargetTask(null)}
+          onAssign={handleAssign}
+        />
+      )}
 
       <style>{`
         .menu-item {

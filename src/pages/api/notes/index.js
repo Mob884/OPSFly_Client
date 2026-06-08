@@ -1,6 +1,8 @@
 import connectDB from '@/lib/mongodb';
 import Note from '@/lib/Note';
+import User from '@/lib/User';
 import { authMiddleware } from '@/lib/auth';
+import { verifyLocationAccess } from '@/lib/scopeByLocation';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end();
@@ -9,9 +11,22 @@ export default async function handler(req, res) {
     const decoded = await authMiddleware(req, res);
     if (!decoded) return;
 
-    let query = {};
-    if (decoded.role !== 'Manager') {
-      query = { userId: decoded.userId };
+    const access = await verifyLocationAccess(req, res, decoded);
+    if (!access) return;
+
+    const { selectedLocationId, user } = access;
+
+    let query = {
+      locationId: selectedLocationId
+    };
+
+    if (user.role === 'department_manager') {
+      const deptUsers = await User.find({
+        locationIds: selectedLocationId,
+        department: user.department
+      }).select('_id');
+      const deptUserIds = deptUsers.map(u => u._id);
+      query.userId = { $in: deptUserIds };
     }
 
     const notes = await Note.find(query).sort({ createdAt: -1 });

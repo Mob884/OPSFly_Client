@@ -1,7 +1,11 @@
 import connectDB from '@/lib/mongodb';
 import Note from '@/lib/Note';
 import Task from '@/lib/Task';
+import User from '@/lib/User';
+import Location from '@/lib/Location';
+import Notification from '@/lib/Notification';
 import { authMiddleware } from '@/lib/auth';
+import { verifyLocationAccess } from '@/lib/scopeByLocation';
 
 /**
  * POST /api/notes/save
@@ -15,22 +19,56 @@ export default async function handler(req, res) {
     const decoded = await authMiddleware(req, res);
     if (!decoded) return;
 
+    const access = await verifyLocationAccess(req, res, decoded);
+    if (!access) return;
+
+    const { selectedLocationId, organizationId, user } = access;
+
+    // Block note creation if location is inactive or soft-deleted
+    const activeLocation = await Location.findById(selectedLocationId);
+    if (!activeLocation || activeLocation.deleted || activeLocation.isActive === false) {
+      return res.status(403).json({ error: 'This location is inactive and cannot accept new notes.' });
+    }
+
     const { transcript, source, issues = [], analyzedAt } = req.body;
 
     if (!transcript?.trim()) {
       return res.status(400).json({ error: 'transcript is required' });
     }
 
-    // 1. Save the note with the creator's userId
+    // 1. Save the note with the creator's userId, locationId, organizationId
     const note = await Note.create({
       transcript: transcript.trim(),
       source: source || 'voice',
       issues,
       analyzedAt: analyzedAt || new Date(),
       userId: decoded.userId,
+      locationId: selectedLocationId,
+      organizationId: organizationId,
     });
 
-    // 2. Auto-create tasks from issues (if any) with the creator's userId
+    // Trigger notification: note_added
+    try {
+      const activeLocUsers = await User.find({
+        locationIds: selectedLocationId,
+        isActive: { $ne: false },
+        deleted: { $ne: true },
+        _id: { $ne: decoded.userId }
+      });
+      if (activeLocUsers.length > 0) {
+        const notificationsToCreate = activeLocUsers.map(u => ({
+          userId: u._id,
+          type: 'note_added',
+          message: `${user.name} added a note`,
+          relatedNoteId: note._id,
+        }));
+        await Notification.insertMany(notificationsToCreate);
+      }
+    } catch (err) {
+      console.error('Failed to create notifications for note', err);
+    }
+
+    // 2. Auto-create tasks from issues (if any) with the creator's userId, locationId, organizationId
     const createdTasks = [];
     if (issues.length > 0) {
       const dueDate = new Date();
@@ -50,6 +88,8 @@ export default async function handler(req, res) {
           sourceIssueType: issue.type,
           dueDate,
           userId: decoded.userId,
+          locationId: selectedLocationId,
+          organizationId: organizationId,
         });
         createdTasks.push(task);
       }

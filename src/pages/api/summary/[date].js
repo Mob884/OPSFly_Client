@@ -2,6 +2,7 @@ import { generateDailySummary, startOfDay } from '@/lib/summaryGenerator';
 import connectDB from '@/lib/mongodb';
 import DailySummary from '@/lib/DailySummary';
 import { authMiddleware } from '@/lib/auth';
+import { verifyLocationAccess } from '@/lib/scopeByLocation';
 
 /**
  * GET /api/summary/[date]
@@ -17,8 +18,14 @@ export default async function handler(req, res) {
     const decoded = await authMiddleware(req, res);
     if (!decoded) return;
 
-    if (decoded.role !== 'Manager') {
-      return res.status(403).json({ error: 'Access denied. Only Managers can view operation summaries.' });
+    const access = await verifyLocationAccess(req, res, decoded);
+    if (!access) return;
+
+    const { selectedLocationId, user } = access;
+
+    const allowedRoles = ['owner', 'district_manager', 'gm', 'agm', 'department_manager', 'Manager'];
+    if (!allowedRoles.includes(user.role)) {
+      return res.status(403).json({ error: 'Access denied. Management only.' });
     }
 
     const parsed = new Date(date);
@@ -26,12 +33,12 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
     }
 
-    // Try to find existing summary first
-    const existing = await DailySummary.findOne({ date: startOfDay(parsed) }).lean();
+    // Try to find existing summary first for this location
+    const existing = await DailySummary.findOne({ date: startOfDay(parsed), locationId: selectedLocationId }).lean();
     if (existing) return res.status(200).json(existing);
 
-    // Generate if missing
-    const generated = await generateDailySummary(parsed);
+    // Generate if missing for this location
+    const generated = await generateDailySummary(parsed, selectedLocationId);
     return res.status(200).json(generated);
   } catch (err) {
     console.error('[/api/summary/:date]', err);

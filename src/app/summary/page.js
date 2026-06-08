@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import Header from '@/src/components/Header';
 import { getTodaySummary, getSummaryByDate, generateTodaySummary } from '@/src/services/api';
+import { useAuth } from '@/src/context/AuthContext';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function fmtDate(d) {
@@ -48,6 +49,7 @@ function StatCard({ label, value, color, icon: Icon }) {
 
 // ── Inner component (uses useSearchParams — must be inside Suspense) ──────────
 function SummaryInner() {
+  const { currentLocationId } = useAuth();
   const searchParams = useSearchParams();
   const [activeDate, setActiveDate] = useState(() => {
     const q = searchParams.get('date');
@@ -59,6 +61,7 @@ function SummaryInner() {
   const [error, setError]        = useState('');
 
   const fetchSummary = useCallback(async (date) => {
+    if (!currentLocationId) return;
     setLoading(true); setError('');
     try {
       const data = isToday(date)
@@ -67,7 +70,7 @@ function SummaryInner() {
       setSummary(data);
     } catch { setError('Could not load summary. Please try again.'); }
     finally  { setLoading(false); }
-  }, []);
+  }, [currentLocationId]);
 
   useEffect(() => { fetchSummary(activeDate); }, [activeDate, fetchSummary]);
 

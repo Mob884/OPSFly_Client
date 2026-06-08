@@ -1,18 +1,40 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Bell, ChevronLeft, LogOut, Shield, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/src/context/AuthContext';
+import { getNotifications } from '@/src/services/api';
 
 export default function Header({ title = 'OpsFly', showBack = false, onBack }) {
   const router = useRouter();
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, logout, isAuthenticated, accessibleLocations, currentLocationId, setCurrentLocationId } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    
+    const fetchUnread = async () => {
+      try {
+        const list = await getNotifications();
+        const unread = list.filter(n => !n.read).length;
+        setUnreadCount(unread);
+      } catch (err) {
+        console.warn('Failed to load notifications for badge', err);
+      }
+    };
+
+    fetchUnread();
+    
+    const interval = setInterval(fetchUnread, 30000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, currentLocationId]);
 
   const handleBack = () => { if (onBack) onBack(); else router.back(); };
 
   const userInitial = user?.name ? user.name.trim().charAt(0).toUpperCase() : 'U';
-  const isManager = user?.role === 'Manager';
+  const isManager = ['owner', 'district_manager', 'gm', 'agm', 'Manager'].includes(user?.role);
+  const showSwitcher = isAuthenticated && ['owner', 'district_manager', 'Manager'].includes(user?.role) && accessibleLocations.length > 0;
 
   const handleLogoutClick = () => {
     logout();
@@ -22,30 +44,81 @@ export default function Header({ title = 'OpsFly', showBack = false, onBack }) {
 
   return (
     <header className="header" style={{ position: 'relative' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         {showBack && (
           <button onClick={handleBack} className="back-btn">
             <ChevronLeft size={24} />
           </button>
         )}
-        <div className="header-logo-group">
+        <div className="header-logo-group" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {!showBack && (
-            <div style={{
-              width: 30, height: 30, borderRadius: '8px',
-              background: 'linear-gradient(135deg, #1D7BFF, #00D4FF)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontWeight: 900, fontSize: '0.85rem', color: '#fff'
-            }}>O</div>
+            <img
+              src="/logo-icon.svg"
+              alt="OpsFly"
+              style={{ width: '28px', height: '28px', objectFit: 'contain' }}
+              onError={(e) => { e.target.src = '/logo-icon.png'; }}
+            />
           )}
-          <span className="header-logo-text">{title}</span>
+          <span className="header-logo-text" style={{ marginRight: '4px' }}>{title}</span>
         </div>
+
+        {showSwitcher && (
+          <select
+            value={currentLocationId || ''}
+            onChange={(e) => setCurrentLocationId(e.target.value)}
+            style={{
+              background: 'rgba(29, 123, 255, 0.12)',
+              border: '1px solid rgba(29, 123, 255, 0.25)',
+              color: '#fff',
+              fontSize: '0.78rem',
+              fontWeight: '800',
+              padding: '4px 10px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              outline: 'none',
+              maxWidth: '160px',
+              textOverflow: 'ellipsis',
+              fontFamily: 'inherit'
+            }}
+          >
+            {accessibleLocations.map(loc => (
+              <option key={loc._id} value={loc._id} style={{ background: '#0D1520', color: '#fff' }}>
+                {loc.name}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {isAuthenticated && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', position: 'relative' }}>
-          <div className="header-bell" style={{ cursor: 'pointer' }}>
+          <div
+            className="header-bell"
+            onClick={() => router.push('/notifications')}
+            style={{ cursor: 'pointer', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
             <Bell size={20} color="var(--text-secondary)" />
-            <div className="header-bell-dot" />
+            {unreadCount > 0 && (
+              <div style={{
+                position: 'absolute',
+                top: '-5px',
+                right: '-5px',
+                background: '#EF4444',
+                color: '#fff',
+                fontSize: '0.62rem',
+                fontWeight: '900',
+                borderRadius: '50%',
+                minWidth: '15px',
+                height: '15px',
+                padding: '0 3px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 0 6px #EF4444'
+              }}>
+                {unreadCount}
+              </div>
+            )}
           </div>
 
           {/* Dynamic Initial Avatar */}

@@ -1,5 +1,6 @@
 import { generateDailySummary } from '@/lib/summaryGenerator';
 import { authMiddleware } from '@/lib/auth';
+import { verifyLocationAccess } from '@/lib/scopeByLocation';
 
 /**
  * GET  /api/summary/today  — fetch (or generate) today's summary
@@ -13,11 +14,18 @@ export default async function handler(req, res) {
     const decoded = await authMiddleware(req, res);
     if (!decoded) return;
 
-    if (decoded.role !== 'Manager') {
-      return res.status(403).json({ error: 'Access denied. Only Managers can view or generate operation summaries.' });
+    const access = await verifyLocationAccess(req, res, decoded);
+    if (!access) return;
+
+    const { selectedLocationId, user } = access;
+
+    // Allowed for all management roles
+    const allowedRoles = ['owner', 'district_manager', 'gm', 'agm', 'department_manager', 'Manager'];
+    if (!allowedRoles.includes(user.role)) {
+      return res.status(403).json({ error: 'Access denied. Management only.' });
     }
 
-    const summary = await generateDailySummary(new Date());
+    const summary = await generateDailySummary(new Date(), selectedLocationId);
     return res.status(200).json(summary);
   } catch (err) {
     console.error('[/api/summary/today]', err);

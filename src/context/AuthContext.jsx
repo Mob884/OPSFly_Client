@@ -9,14 +9,52 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [accessibleLocations, setAccessibleLocations] = useState([]);
+  const [currentLocationId, setCurrentLocationIdState] = useState(null);
 
-  // Set up request interceptor for Axios instance so it always includes token
+  const setCurrentLocationId = (id) => {
+    if (id) {
+      localStorage.setItem('opsfly_location_id', id);
+    } else {
+      localStorage.removeItem('opsfly_location_id');
+    }
+    setCurrentLocationIdState(id);
+    invalidateNotesCache();
+    invalidateTasksCache();
+  };
+
+  const fetchLocations = async (authToken) => {
+    try {
+      const res = await axios.get('/api/locations', {
+        headers: { Authorization: `Bearer ${authToken}` }
+      });
+      const locs = res.data || [];
+      setAccessibleLocations(locs);
+      
+      const storedLoc = localStorage.getItem('opsfly_location_id');
+      if (storedLoc && locs.some(l => l._id === storedLoc)) {
+        setCurrentLocationIdState(storedLoc);
+      } else if (locs.length > 0) {
+        setCurrentLocationId(locs[0]._id);
+      } else {
+        setCurrentLocationId(null);
+      }
+    } catch (err) {
+      console.error('Failed to fetch locations', err);
+    }
+  };
+
+  // Set up request interceptor for Axios instance so it always includes token & location-id
   useEffect(() => {
     const requestInterceptor = api.interceptors.request.use(
       (config) => {
         const storedToken = localStorage.getItem('opsfly_token');
         if (storedToken) {
           config.headers.Authorization = `Bearer ${storedToken}`;
+        }
+        const storedLocationId = localStorage.getItem('opsfly_location_id');
+        if (storedLocationId) {
+          config.headers['x-location-id'] = storedLocationId;
         }
         return config;
       },
@@ -30,7 +68,6 @@ export function AuthProvider({ children }) {
       (response) => response,
       (error) => {
         if (error.response?.status === 401) {
-          // Automatic logout on unauthorized session
           logout();
         }
         return Promise.reject(error);
@@ -62,6 +99,7 @@ export function AuthProvider({ children }) {
           if (response.data?.user) {
             setUser(response.data.user);
             localStorage.setItem('opsfly_user', JSON.stringify(response.data.user));
+            await fetchLocations(storedToken);
           }
         }
       } catch (err) {
@@ -89,6 +127,8 @@ export function AuthProvider({ children }) {
       invalidateNotesCache();
       invalidateTasksCache();
       
+      await fetchLocations(receivedToken);
+
       return response.data;
     } catch (error) {
       const message = error.response?.data?.error || error.message || 'Login failed';
@@ -110,6 +150,8 @@ export function AuthProvider({ children }) {
       invalidateNotesCache();
       invalidateTasksCache();
 
+      await fetchLocations(receivedToken);
+
       return response.data;
     } catch (error) {
       const message = error.response?.data?.error || error.message || 'Registration failed';
@@ -117,11 +159,45 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const onboard = async (orgName, orgIndustry, locations, name, email, password, invites) => {
+    try {
+      const response = await axios.post('/api/auth/onboard', {
+        orgName,
+        orgIndustry,
+        locations,
+        name,
+        email,
+        password,
+        invites
+      });
+      const { token: receivedToken, user: receivedUser, invitedMembers } = response.data;
+
+      localStorage.setItem('opsfly_token', receivedToken);
+      localStorage.setItem('opsfly_user', JSON.stringify(receivedUser));
+
+      setToken(receivedToken);
+      setUser(receivedUser);
+
+      invalidateNotesCache();
+      invalidateTasksCache();
+
+      await fetchLocations(receivedToken);
+
+      return response.data;
+    } catch (error) {
+      const message = error.response?.data?.error || error.message || 'Onboarding failed';
+      throw new Error(message);
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem('opsfly_token');
     localStorage.removeItem('opsfly_user');
+    localStorage.removeItem('opsfly_location_id');
     setToken(null);
     setUser(null);
+    setAccessibleLocations([]);
+    setCurrentLocationIdState(null);
 
     invalidateNotesCache();
     invalidateTasksCache();
@@ -133,8 +209,13 @@ export function AuthProvider({ children }) {
     loading,
     login,
     register,
+    onboard,
     logout,
     isAuthenticated: !!user,
+    accessibleLocations,
+    currentLocationId,
+    setCurrentLocationId,
+    refreshLocations: () => token && fetchLocations(token)
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

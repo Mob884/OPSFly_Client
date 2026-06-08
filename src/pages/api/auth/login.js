@@ -28,6 +28,11 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
+    // Check if user is deactivated or deleted
+    if (user.isActive === false || user.deleted === true) {
+      return res.status(403).json({ error: 'Your account has been deactivated. Please contact your administrator.' });
+    }
+
     // 3. Verify password
     const isMatch = await bcrypt.compare(password.trim(), user.password);
     if (!isMatch) {

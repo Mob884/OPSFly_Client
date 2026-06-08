@@ -1,6 +1,7 @@
 import connectDB from '@/lib/mongodb';
 import DailySummary from '@/lib/DailySummary';
 import { authMiddleware } from '@/lib/auth';
+import { verifyLocationAccess } from '@/lib/scopeByLocation';
 
 /**
  * GET /api/summary/list
@@ -14,11 +15,17 @@ export default async function handler(req, res) {
     const decoded = await authMiddleware(req, res);
     if (!decoded) return;
 
-    if (decoded.role !== 'Manager') {
-      return res.status(403).json({ error: 'Access denied. Only Managers can view operation report lists.' });
+    const access = await verifyLocationAccess(req, res, decoded);
+    if (!access) return;
+
+    const { selectedLocationId, user } = access;
+
+    const allowedRoles = ['owner', 'district_manager', 'gm', 'agm', 'department_manager', 'Manager'];
+    if (!allowedRoles.includes(user.role)) {
+      return res.status(403).json({ error: 'Access denied. Management only.' });
     }
 
-    const summaries = await DailySummary.find()
+    const summaries = await DailySummary.find({ locationId: selectedLocationId })
       .select('date totalIssues totalTasks completedTasks generatedAt')
       .sort({ date: -1 })
       .lean();

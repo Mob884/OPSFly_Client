@@ -39,18 +39,29 @@ export default function LoginPage() {
         {/* Brand Glow Logo */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
           <div style={{
-            position: 'relative', width: '64px', height: '64px', borderRadius: '18px',
-            background: 'linear-gradient(135deg, #1D7BFF 0%, #00D4FF 100%)',
+            position: 'relative', width: '80px', height: '80px', borderRadius: '20px',
+            background: 'rgba(255, 255, 255, 0.03)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 8px 32px rgba(29, 123, 255, 0.4)', marginBottom: '16px'
+            boxShadow: '0 12px 32px rgba(0, 0, 0, 0.3)', marginBottom: '16px'
           }}>
-            <Sparkles size={32} color="#fff" />
+            <img 
+              src="/logo-icon.svg" 
+              alt="OpsFly Icon" 
+              style={{ width: '56px', height: '56px', objectFit: 'contain' }}
+              onError={(e) => { e.target.src = '/logo-icon.png'; }}
+            />
             <div style={{
-              position: 'absolute', inset: '-6px', borderRadius: '24px',
-              border: '2px dashed rgba(29,123,255,0.4)', animation: 'rotate 15s linear infinite'
+              position: 'absolute', inset: '-6px', borderRadius: '26px',
+              border: '1px dashed rgba(29, 123, 255, 0.25)', animation: 'rotate 20s linear infinite'
             }} />
           </div>
-          <h2 style={{ fontSize: '1.6rem', fontWeight: '900', letterSpacing: '-0.5px' }}>Welcome to OpsFly</h2>
+          <img 
+            src="/logo-full.svg" 
+            alt="OpsFly" 
+            style={{ height: '36px', objectFit: 'contain', marginBottom: '4px' }}
+            onError={(e) => { e.target.src = '/logo-full.png'; }}
+          />
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '4px' }}>
             AI-powered operations intelligence for teams
           </p>

@@ -105,6 +105,14 @@ export async function deleteTask(id) {
 // Keep backwards compat
 export function invalidateTasksCache() { store.tasks = null; }
 
+/** Assign task to a user */
+export async function assignTask(id, assignedTo) {
+  const response = await api.patch(`/api/tasks/${id}`, { action: 'assign', assignedTo });
+  const updated = response.data;
+  if (store.tasks) store.tasks = store.tasks.map(t => t._id === id ? updated : t);
+  return updated;
+}
+
 // ── Summary (M4) ─────────────────────────────────────────────────────────────
 
 /** Fetch (or generate) today's daily summary */
@@ -128,6 +136,20 @@ export async function getSummaryByDate(date) {
 /** Fetch list of all past summaries (lightweight) */
 export async function getSummaryList() {
   const response = await api.get('/api/summary/list');
+  return response.data;
+}
+
+// ── Notifications ────────────────────────────────────────────────────────────
+
+/** Fetch recent notifications for logged in user */
+export async function getNotifications() {
+  const response = await api.get('/api/notifications');
+  return response.data;
+}
+
+/** Mark all or specific notifications as read */
+export async function markNotificationsAsRead(ids = null) {
+  const response = await api.patch('/api/notifications', { ids });
   return response.data;
 }
 
