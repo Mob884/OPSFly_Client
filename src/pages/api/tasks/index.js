@@ -135,6 +135,19 @@ export default async function handler(req, res) {
             message: `New task assigned: ${task.title}`,
             relatedTaskId: task._id
           });
+
+          // TRIGGER PUSH
+          try {
+            const { sendPushNotification } = require('@/lib/pushNotifications');
+            await sendPushNotification(
+              task.assignedTo,
+              'New Task Assigned',
+              `New task assigned: ${task.title}`,
+              { relatedTaskId: task._id, type: 'task_assigned' }
+            );
+          } catch (pushErr) {
+            console.error('FCM push error for task_assigned:', pushErr);
+          }
         } catch (nErr) {
           console.error('Failed to create assignment notification', nErr);
         }

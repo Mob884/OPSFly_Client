@@ -82,6 +82,21 @@ export default async function handler(req, res) {
               relatedTaskId: task._id
             }));
             await Notification.insertMany(notifications);
+
+            // TRIGGER PUSH
+            try {
+              const { sendPushNotification } = require('@/lib/pushNotifications');
+              for (const uid of Array.from(recipients)) {
+                await sendPushNotification(
+                  uid,
+                  'Task Completed',
+                  `${user.name} completed: ${task.title}`,
+                  { relatedTaskId: task._id, type: 'task_completed' }
+                );
+              }
+            } catch (pushErr) {
+              console.error('FCM push error for task_completed:', pushErr);
+            }
           }
         } catch (nErr) {
           console.error('Failed to create task completion notification', nErr);
@@ -154,6 +169,19 @@ export default async function handler(req, res) {
               message: `New task assigned: ${task.title}`,
               relatedTaskId: task._id
             });
+
+            // TRIGGER PUSH
+            try {
+              const { sendPushNotification } = require('@/lib/pushNotifications');
+              await sendPushNotification(
+                task.assignedTo,
+                'New Task Assigned',
+                `New task assigned: ${task.title}`,
+                { relatedTaskId: task._id, type: 'task_assigned' }
+              );
+            } catch (pushErr) {
+              console.error('FCM push error for task_assigned:', pushErr);
+            }
           } catch (nErr) {
             console.error('Failed to create assignment notification', nErr);
           }

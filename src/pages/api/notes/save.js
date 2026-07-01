@@ -63,6 +63,24 @@ export default async function handler(req, res) {
           relatedNoteId: note._id,
         }));
         await Notification.insertMany(notificationsToCreate);
+
+        // TRIGGER PUSH: notify GM/managers at that location
+        try {
+          const { sendPushNotification } = require('@/lib/pushNotifications');
+          const managersToNotify = activeLocUsers.filter(u =>
+            ['owner', 'district_manager', 'gm', 'agm', 'Manager'].includes(u.role)
+          );
+          for (const mgr of managersToNotify) {
+            await sendPushNotification(
+              mgr._id,
+              'New Note Added',
+              `${user.name} added a note at ${activeLocation.name}`,
+              { relatedNoteId: note._id, type: 'note_added' }
+            );
+          }
+        } catch (pushErr) {
+          console.error('FCM push error for note_added:', pushErr);
+        }
       }
     } catch (err) {
       console.error('Failed to create notifications for note', err);
