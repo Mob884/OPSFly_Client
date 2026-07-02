@@ -1,3 +1,4 @@
+// Trigger rebuild
 import connectDB from '@/lib/mongodb';
 import { authMiddleware } from '@/lib/auth';
 import { sendToToken, isFirebaseReady } from '@/lib/pushNotifications';
