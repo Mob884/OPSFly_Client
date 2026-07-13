@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useAuth } from '@/src/context/AuthContext';
 import {
   User, Mail, KeyRound, Loader2, ShieldAlert, Building2, MapPin,
-  ArrowRight, ArrowLeft, Briefcase, Plus, Trash2, CheckCircle2, UserPlus
+  ArrowRight, ArrowLeft, Briefcase, Plus, Trash2, CheckCircle2, UserPlus, Lock
 } from 'lucide-react';
 import Header from '@/src/components/Header';
 
