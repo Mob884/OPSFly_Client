@@ -4,6 +4,7 @@ import Task from '@/lib/Task';
 import User from '@/lib/User';
 import Location from '@/lib/Location';
 import Notification from '@/lib/Notification';
+import TenantMemory from '@/lib/TenantMemory';
 import { authMiddleware } from '@/lib/auth';
 import { verifyLocationAccess } from '@/lib/scopeByLocation';
 
@@ -46,6 +47,28 @@ export default async function handler(req, res) {
       locationId: selectedLocationId,
       organizationId: organizationId,
     });
+
+    // Create TenantMemory from saved note (Vault 1)
+    try {
+      const memoryContent = `${note.transcript}. Issues detected: ${
+        (note.issues || []).map((i) => `${i.categoryKey || i.type}: ${i.quote}`).join(', ')
+      }`;
+
+      await TenantMemory.create({
+        organizationId: note.organizationId,
+        locationId: note.locationId,
+        memoryType: 'observation',
+        content: memoryContent,
+        metadata: {
+          sourceNoteId: note._id,
+          captureSource: note.captureSource,
+          tags: (note.issues || []).map((i) => i.categoryKey || i.type),
+        },
+      });
+    } catch (e) {
+      // Don't fail note save if memory creation fails
+      console.error('TenantMemory creation failed:', e.message);
+    }
 
     // Trigger notification: note_added
     try {

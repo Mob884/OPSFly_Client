@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import fs from 'fs';
 import { analyzeTranscript } from '@/lib/analyzer';
 import connectDB from '@/lib/mongodb';
+import User from '@/lib/User';
 import { authMiddleware } from '@/lib/auth';
 
 const upload = multer({ dest: '/tmp/' });
@@ -63,7 +64,8 @@ export default async function handler(req, res) {
     }
 
     // Trigger AI analysis automatically on transcript
-    const analysis = await analyzeTranscript(transcript);
+    const user = await User.findById(decoded.userId);
+    const analysis = await analyzeTranscript(transcript, user?.organizationId);
 
     // Clean up temporary audio file
     try {

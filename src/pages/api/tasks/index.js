@@ -6,6 +6,8 @@ import '@/lib/Note'; // register Note schema so Task.populate('sourceNoteId') wo
 import { authMiddleware } from '@/lib/auth';
 import { verifyLocationAccess } from '@/lib/scopeByLocation';
 
+const PRIORITY_KEY_MAP = { High: 'high', Medium: 'medium', Low: 'low' };
+
 /**
  * GET  /api/tasks         — fetch all tasks (sorted High → Medium → Low)
  * POST /api/tasks         — create a new task
@@ -116,6 +118,7 @@ export default async function handler(req, res) {
       const task = await Task.create({
         title: title.trim(),
         priority,
+        priorityKey: PRIORITY_KEY_MAP[priority] || 'medium',
         sourceNoteId: sourceNoteId || null,
         sourceIssueType: sourceIssueType || null,
         dueDate,
