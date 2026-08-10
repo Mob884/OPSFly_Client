@@ -7,6 +7,7 @@ import {
   ClipboardCheck, ChevronRight, Loader2, CalendarDays, ArrowLeft, Building2, TrendingUp, CheckCircle, Clock
 } from 'lucide-react';
 import Header from '@/src/components/Header';
+import OnboardingBanner from '@/src/components/dna/OnboardingBanner';
 import { getNotes, getTasks, analyzeNote, getTodaySummary } from '@/src/services/api';
 import { useAuth } from '@/src/context/AuthContext';
 import axios from 'axios';
@@ -210,7 +211,8 @@ export default function Home() {
   return (
     <>
       <Header />
-      
+      <OnboardingBanner />
+
       {/* ────────────────── OVERVIEW VIEW MODE ────────────────── */}
       {isOwnerOrDM && viewMode === 'overview' && (
         <main className="page" style={{ paddingBottom: '30px', gap: '22px' }}>

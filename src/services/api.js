@@ -139,6 +139,38 @@ export async function getSummaryList() {
   return response.data;
 }
 
+// ── Business DNA (M2) ─────────────────────────────────────────────────────────
+
+/** Industry config (category pills, labels) for the current org. */
+export const getIndustryConfig = () => api.get('/api/config').then((r) => r.data);
+
+export const getBusinessProfile = () => api.get('/api/dna/profile').then((r) => r.data);
+export const saveBusinessProfile = (data) => api.post('/api/dna/profile', data).then((r) => r.data);
+
+export const getAssets = (params) => api.get('/api/dna/assets', { params }).then((r) => r.data);
+export const addAsset = (data) => api.post('/api/dna/assets', data).then((r) => r.data);
+export const updateAsset = (id, data) => api.put(`/api/dna/assets/${id}`, data).then((r) => r.data);
+export const deleteAsset = (id) => api.delete(`/api/dna/assets/${id}`).then((r) => r.data);
+
+export const getVendors = (params) => api.get('/api/dna/vendors', { params }).then((r) => r.data);
+export const addVendor = (data) => api.post('/api/dna/vendors', data).then((r) => r.data);
+export const updateVendor = (id, data) => api.put(`/api/dna/vendors/${id}`, data).then((r) => r.data);
+export const deleteVendor = (id) => api.delete(`/api/dna/vendors/${id}`).then((r) => r.data);
+
+/** Upload a raw file (FormData with a 'file' field) → { fileKey, signedUrl }. */
+export const uploadFile = (formData) => api.post('/api/upload', formData).then((r) => r.data);
+
+export const getDocuments = (params) => api.get('/api/dna/documents', { params }).then((r) => r.data);
+export const uploadDocument = (data) => api.post('/api/dna/documents', data).then((r) => r.data);
+export const deleteDocument = (id) => api.delete(`/api/dna/documents/${id}`).then((r) => r.data);
+
+export const getDNAEntries = (params) => api.get('/api/dna/entries', { params }).then((r) => r.data);
+export const addDNAEntry = (data) => api.post('/api/dna/entries', data).then((r) => r.data);
+export const updateDNAEntry = (id, data) => api.put(`/api/dna/entries/${id}`, data).then((r) => r.data);
+
+export const getOnboardingStatus = () => api.get('/api/dna/onboarding/status').then((r) => r.data);
+export const updateOnboardingStep = (step) => api.patch('/api/dna/onboarding/step', { step }).then((r) => r.data);
+
 // ── Notifications ────────────────────────────────────────────────────────────
 
 /** Fetch recent notifications for logged in user */

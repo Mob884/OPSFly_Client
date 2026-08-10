@@ -7,6 +7,7 @@ import User from '@/lib/User';
 import Note from '@/lib/Note';
 import CaptureEvent from '@/lib/CaptureEvent';
 import TenantMemory from '@/lib/TenantMemory';
+import BusinessDNAEntry from '@/lib/BusinessDNAEntry';
 import { authMiddleware } from '@/lib/auth';
 import { analyzeTranscript } from '@/lib/analyzer';
 import { transcribeAudio } from '@/lib/whisper';
@@ -115,6 +116,26 @@ export default async function handler(req, res) {
     } catch (e) {
       // Don't fail the capture if memory creation fails
       console.error('TenantMemory creation failed:', e.message);
+    }
+
+    // Auto-grow Business DNA from detected observations (same as notes/save).
+    try {
+      if (note.issues && note.issues.length > 0) {
+        for (const issue of note.issues) {
+          await BusinessDNAEntry.create({
+            organizationId: note.organizationId,
+            locationId: note.locationId,
+            entryType: 'observation',
+            title: `${issue.categoryKey || issue.type || 'general'} observation`,
+            content: issue.quote || issue.suggestedTask || note.transcript,
+            sourceType: 'voice_note',
+            sourceId: note._id,
+            tags: [issue.categoryKey || issue.type, issue.severityKey || issue.severity].filter(Boolean),
+          });
+        }
+      }
+    } catch (e) {
+      console.error('BusinessDNAEntry auto-creation failed:', e.message);
     }
 
     captureEvent.processingStatus = 'complete';

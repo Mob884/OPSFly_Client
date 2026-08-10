@@ -1,15 +1,17 @@
 "use client";
 import React, { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import Header from '@/src/components/Header';
 import { useAuth } from '@/src/context/AuthContext';
 import {
   Settings, LogOut, Shield, User, Bell, AppWindow,
   HelpCircle, Plus, Users, Edit3, MapPin, Loader2, X, PlusCircle,
-  Building2, Briefcase, Calendar, ChevronRight, Lock, Eye, EyeOff, CheckCircle2, AlertTriangle
+  Building2, Briefcase, Calendar, ChevronRight, Lock, Eye, EyeOff, CheckCircle2, AlertTriangle, Dna
 } from 'lucide-react';
 import axios from 'axios';
 
 export default function MorePage() {
+  const router = useRouter();
   const { user, logout, currentLocationId, refreshLocations, accessibleLocations } = useAuth();
   
   // Section router state: 'root', 'org', 'locations', 'location-detail', 'team', 'user-detail', 'profile', 'app-settings'
@@ -469,6 +471,17 @@ export default function MorePage() {
                   <div style={{ flex: 1, textAlign: 'left' }}>
                     <span className="settings-menu-title">Team Management</span>
                     <span className="settings-menu-desc">Invite members, assign roles, reset passwords</span>
+                  </div>
+                  <ChevronRight size={16} color="var(--text-muted)" />
+                </button>
+              )}
+
+              {isManagement && (
+                <button className="settings-menu-item" onClick={() => router.push('/business-dna')}>
+                  <Dna size={18} color="#00D4FF" />
+                  <div style={{ flex: 1, textAlign: 'left' }}>
+                    <span className="settings-menu-title">Business DNA</span>
+                    <span className="settings-menu-desc">Restaurant profile, equipment, vendors & knowledge</span>
                   </div>
                   <ChevronRight size={16} color="var(--text-muted)" />
                 </button>

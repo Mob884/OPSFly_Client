@@ -5,6 +5,7 @@ import User from '@/lib/User';
 import Location from '@/lib/Location';
 import Notification from '@/lib/Notification';
 import TenantMemory from '@/lib/TenantMemory';
+import BusinessDNAEntry from '@/lib/BusinessDNAEntry';
 import { authMiddleware } from '@/lib/auth';
 import { verifyLocationAccess } from '@/lib/scopeByLocation';
 
@@ -68,6 +69,27 @@ export default async function handler(req, res) {
     } catch (e) {
       // Don't fail note save if memory creation fails
       console.error('TenantMemory creation failed:', e.message);
+    }
+
+    // Auto-grow Business DNA: every detected observation becomes a
+    // BusinessDNAEntry, so the knowledge base grows with each voice note.
+    try {
+      if (note.issues && note.issues.length > 0) {
+        for (const issue of note.issues) {
+          await BusinessDNAEntry.create({
+            organizationId: note.organizationId,
+            locationId: note.locationId,
+            entryType: 'observation',
+            title: `${issue.categoryKey || issue.type || 'general'} observation`,
+            content: issue.quote || issue.suggestedTask || note.transcript,
+            sourceType: 'voice_note',
+            sourceId: note._id,
+            tags: [issue.categoryKey || issue.type, issue.severityKey || issue.severity].filter(Boolean),
+          });
+        }
+      }
+    } catch (e) {
+      console.error('BusinessDNAEntry auto-creation failed:', e.message);
     }
 
     // Trigger notification: note_added
