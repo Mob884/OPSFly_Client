@@ -42,30 +42,40 @@ export default async function handler(req, res) {
     }
 
         const audioPath = req.file.path;
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    // Bounded timeout + our own retry loop (each attempt opens a fresh
+    // connection) instead of the SDK's default 10-minute timeout/backoff —
+    // serverless functions can hand a request a stale keep-alive socket from
+    // a previous (frozen) invocation, and a fresh attempt reliably recovers.
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 25000, maxRetries: 0 });
+    const originalName = req.file.originalname || 'audio.m4a';
 
     let transcript = '';
-    try {
-      // Create a file-like object with a proper extension to tell Whisper the format
-      const originalName = req.file.originalname || 'audio.m4a';
-      const fileStream = fs.createReadStream(audioPath);
-      const fileObject = await OpenAI.toFile(fileStream, originalName);
+    let lastError = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const fileObject = await OpenAI.toFile(fs.createReadStream(audioPath), originalName);
+        const transcription = await openai.audio.transcriptions.create({
+          file: fileObject,
+          model: 'whisper-1',
+        });
+        transcript = transcription.text;
+        lastError = null;
+        console.log(`[Transcribe API] Whisper succeeded on attempt ${attempt}:`, transcript);
+        break;
+      } catch (whisperError) {
+        lastError = whisperError;
+        console.warn(`[Transcribe API] Whisper attempt ${attempt} failed:`, whisperError.status, whisperError.message);
+      }
+    }
 
-      // Call OpenAI Whisper API for transcription
-      const transcription = await openai.audio.transcriptions.create({
-        file: fileObject,
-        model: 'whisper-1',
-      });
-      transcript = transcription.text;
-      console.log('[Transcribe API] Successfully transcribed audio via OpenAI Whisper API:', transcript);
-    } catch (whisperError) {
+    if (lastError) {
       // Do NOT fabricate a transcript on failure — that silently creates fake
       // notes/tasks from unrelated canned text. Surface the real failure instead.
-      console.error('[Transcribe API] OpenAI Whisper failed:', whisperError.status, whisperError.message);
+      console.error('[Transcribe API] OpenAI Whisper failed after retries:', lastError.status, lastError.message);
       try { fs.unlinkSync(audioPath); } catch (e) { /* best effort */ }
       return res.status(502).json({
         error: 'Transcription failed. Please try again.',
-        detail: whisperError.message,
+        detail: lastError.message,
       });
     }
 
