@@ -59,8 +59,14 @@ export default async function handler(req, res) {
       transcript = transcription.text;
       console.log('[Transcribe API] Successfully transcribed audio via OpenAI Whisper API:', transcript);
     } catch (whisperError) {
-      console.warn('[Transcribe API] OpenAI Whisper failed, falling back to simulated transcript:', whisperError.message);
-      transcript = 'The kitchen walk-in refrigerator temperature was registered at 46 degrees today. Also, two servers did not show up for the lunch rush, leaving us understaffed in the front of house. We must call a technician to inspect the fridge and adjust our staffing schedule.';
+      // Do NOT fabricate a transcript on failure — that silently creates fake
+      // notes/tasks from unrelated canned text. Surface the real failure instead.
+      console.error('[Transcribe API] OpenAI Whisper failed:', whisperError.status, whisperError.message);
+      try { fs.unlinkSync(audioPath); } catch (e) { /* best effort */ }
+      return res.status(502).json({
+        error: 'Transcription failed. Please try again.',
+        detail: whisperError.message,
+      });
     }
 
     // Trigger AI analysis automatically on transcript
