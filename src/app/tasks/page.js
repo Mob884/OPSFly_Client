@@ -1,9 +1,10 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import {
   Users, DollarSign, Wrench, AlertTriangle,
   CheckCircle2, RotateCcw, Trash2, Plus,
-  Loader2, ClipboardList, X, ChevronDown, UserCheck
+  Loader2, ClipboardList, X, ChevronDown, UserCheck, ListChecks, ChevronRight
 } from 'lucide-react';
 import Header from '@/src/components/Header';
 import { getTasks, createTask, completeTask, reopenTask, deleteTask, assignTask } from '@/src/services/api';
@@ -519,6 +520,18 @@ export default function TasksPage() {
             fontSize: '0.875rem', color: '#EF4444',
           }}>{error}</div>
         )}
+
+        {/* Corrective Actions entry point */}
+        <Link href="/corrective" style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          background: 'var(--bg-card)', border: '1px solid var(--border)',
+          borderRadius: 12, padding: '12px 14px', marginBottom: 14,
+          textDecoration: 'none', color: 'inherit',
+        }}>
+          <ListChecks size={17} color="var(--primary)" />
+          <span style={{ flex: 1, fontSize: '0.85rem', fontWeight: 700, color: '#fff' }}>Corrective Actions</span>
+          <ChevronRight size={16} color="var(--text-muted)" />
+        </Link>
 
         {/* Tab switcher */}
         <div style={{

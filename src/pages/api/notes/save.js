@@ -6,8 +6,10 @@ import Location from '@/lib/Location';
 import Notification from '@/lib/Notification';
 import TenantMemory from '@/lib/TenantMemory';
 import BusinessDNAEntry from '@/lib/BusinessDNAEntry';
+import WalkSession from '@/lib/WalkSession';
 import { authMiddleware } from '@/lib/auth';
 import { verifyLocationAccess } from '@/lib/scopeByLocation';
+import { createCorrectiveAction } from '@/lib/correctiveActions';
 
 /**
  * POST /api/notes/save
@@ -38,6 +40,25 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'transcript is required' });
     }
 
+    // Tag this note as a walk note if the manager has an active Four Corner
+    // Walk session at this location.
+    let activeWalk = null;
+    try {
+      activeWalk = await WalkSession.findOne({
+        managerId: decoded.userId,
+        locationId: selectedLocationId,
+        status: 'active',
+      });
+      if (activeWalk && activeWalk.timeoutAt && activeWalk.timeoutAt < new Date()) {
+        activeWalk.status = 'timed_out';
+        activeWalk.endedAt = activeWalk.timeoutAt;
+        await activeWalk.save();
+        activeWalk = null;
+      }
+    } catch (e) {
+      console.error('Failed to check active walk session', e);
+    }
+
     // 1. Save the note with the creator's userId, locationId, organizationId
     const note = await Note.create({
       transcript: transcript.trim(),
@@ -47,7 +68,19 @@ export default async function handler(req, res) {
       userId: decoded.userId,
       locationId: selectedLocationId,
       organizationId: organizationId,
+      walkSessionId: activeWalk?._id || null,
+      isWalkNote: !!activeWalk,
     });
+
+    if (activeWalk) {
+      try {
+        activeWalk.noteIds.push(note._id);
+        activeWalk.noteCount = (activeWalk.noteCount || 0) + 1;
+        await activeWalk.save();
+      } catch (e) {
+        console.error('Failed to tag walk session with new note', e);
+      }
+    }
 
     // Create TenantMemory from saved note (Vault 1)
     try {
@@ -90,6 +123,33 @@ export default async function handler(req, res) {
       }
     } catch (e) {
       console.error('BusinessDNAEntry auto-creation failed:', e.message);
+    }
+
+    // Auto-track corrective actions for anything serious enough to need
+    // follow-through — not every note, only high severity or maintenance
+    // issues.
+    try {
+      if (note.issues && note.issues.length > 0) {
+        for (const issue of note.issues) {
+          const isHighSeverity = (issue.severityKey || issue.severity || '').toLowerCase() === 'high';
+          const isMaintenance = (issue.categoryKey || issue.type || '').toLowerCase().includes('maint');
+          if (!isHighSeverity && !isMaintenance) continue;
+
+          await createCorrectiveAction({
+            organizationId: note.organizationId,
+            locationId: note.locationId,
+            sourceNoteId: note._id,
+            sourceQuote: issue.quote,
+            sourceTimestamp: note.analyzedAt || note.createdAt,
+            sourceManagerId: decoded.userId,
+            assetId: issue.assetId,
+            vendorId: issue.vendorId,
+            isIncident: (issue.categoryKey || '').toLowerCase() === 'safety' || (issue.categoryKey || '').toLowerCase() === 'incident',
+          });
+        }
+      }
+    } catch (e) {
+      console.error('CorrectiveAction auto-creation failed:', e.message);
     }
 
     // Trigger notification: note_added

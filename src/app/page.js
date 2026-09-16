@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import Header from '@/src/components/Header';
 import OnboardingBanner from '@/src/components/dna/OnboardingBanner';
+import WalkStatusPanel from '@/src/components/walk/WalkStatusPanel';
 import { getNotes, getTasks, analyzeNote, getTodaySummary } from '@/src/services/api';
 import { useAuth } from '@/src/context/AuthContext';
 import axios from 'axios';
@@ -212,6 +213,7 @@ export default function Home() {
     <>
       <Header />
       <OnboardingBanner />
+      <WalkStatusPanel />
 
       {/* ────────────────── OVERVIEW VIEW MODE ────────────────── */}
       {isOwnerOrDM && viewMode === 'overview' && (

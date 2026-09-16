@@ -6,7 +6,8 @@ import {
   Wrench, Edit2, Trash2, Loader2, ClipboardList
 } from 'lucide-react';
 import Header from '@/src/components/Header';
-import { saveNote } from '@/src/services/api';
+import { saveNote, getAssets, getVendors } from '@/src/services/api';
+import { Link2, Check } from 'lucide-react';
 
 const SEVERITY_COLOR = { high: '#EF4444', medium: '#FF8A00', low: '#22C55E' };
 
@@ -30,6 +31,8 @@ export default function AnalysisPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editedTranscript, setEditedTranscript] = useState('');
   const [savedTasks, setSavedTasks] = useState(null); // null = not saved yet, [] = saved with no tasks
+  const [dnaMatches, setDnaMatches] = useState({}); // { issueIdx: { kind: 'asset'|'vendor', id, name } }
+  const [linkedIssues, setLinkedIssues] = useState({}); // { issueIdx: true } — user-confirmed links
 
   useEffect(() => {
     const data = sessionStorage.getItem('lastAnalysis');
@@ -42,6 +45,32 @@ export default function AnalysisPage() {
     }
   }, []);
 
+  // Best-effort keyword match against existing Business DNA (equipment +
+  // vendors) so a manager can link an issue to the asset it's about without
+  // typing it in twice. No match found is the common, expected case.
+  useEffect(() => {
+    if (!analysisData?.issues?.length) return;
+    (async () => {
+      try {
+        const [assets, vendors] = await Promise.all([getAssets({}), getVendors({})]);
+        const matches = {};
+        analysisData.issues.forEach((issue, idx) => {
+          const words = `${issue.quote || ''} ${issue.type || ''}`.toLowerCase().split(/\W+/).filter((w) => w.length > 3);
+          const asset = (assets || []).find((a) => {
+            const name = (a.name || '').toLowerCase();
+            return name && words.some((w) => name.includes(w) || w.includes(name.split(' ')[0]));
+          });
+          if (asset) { matches[idx] = { kind: 'asset', id: asset._id, name: asset.name }; return; }
+          const vendor = (vendors || []).find((v) => words.some((w) => (v.category || '').toLowerCase().includes(w)));
+          if (vendor) matches[idx] = { kind: 'vendor', id: vendor._id, name: vendor.name };
+        });
+        setDnaMatches(matches);
+      } catch {
+        // DNA linking is a nice-to-have — never block the save flow on it.
+      }
+    })();
+  }, [analysisData]);
+
   if (!analysisData) return null;
 
   const { issues = [] } = analysisData;
@@ -49,10 +78,15 @@ export default function AnalysisPage() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      const issuesToSave = issues.map((issue, idx) => {
+        if (!linkedIssues[idx] || !dnaMatches[idx]) return issue;
+        const key = dnaMatches[idx].kind === 'asset' ? 'assetId' : 'vendorId';
+        return { ...issue, [key]: dnaMatches[idx].id };
+      });
       const result = await saveNote({
         transcript: editedTranscript,
         source: analysisData.source || 'voice',
-        issues,
+        issues: issuesToSave,
         analyzedAt: analysisData.analyzedAt || new Date(),
       });
       // Show the auto-created tasks
@@ -215,6 +249,29 @@ export default function AnalysisPage() {
                       }}>
                         <ClipboardList size={13} />
                         Task will be created: <strong>{issue.suggestedTask}</strong>
+                      </div>
+                    )}
+                    {dnaMatches[idx] && (
+                      <div style={{
+                        marginTop: 8, padding: '8px 12px', borderRadius: 8,
+                        background: linkedIssues[idx] ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.04)',
+                        border: `1px solid ${linkedIssues[idx] ? 'rgba(34,197,94,0.3)' : 'var(--border)'}`,
+                        display: 'flex', alignItems: 'center', gap: 8,
+                      }}>
+                        <Link2 size={13} color={linkedIssues[idx] ? '#22C55E' : 'var(--text-secondary)'} />
+                        <span style={{ flex: 1, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                          This looks related to <strong style={{ color: '#fff' }}>{dnaMatches[idx].name}</strong>. Link it?
+                        </span>
+                        <button
+                          onClick={() => setLinkedIssues((prev) => ({ ...prev, [idx]: !prev[idx] }))}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 999,
+                            border: 'none', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 800,
+                            background: linkedIssues[idx] ? '#22C55E' : 'var(--primary)', color: '#fff',
+                          }}
+                        >
+                          {linkedIssues[idx] ? <><Check size={11} /> Linked</> : 'Yes'}
+                        </button>
                       </div>
                     )}
                   </div>

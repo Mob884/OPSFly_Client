@@ -171,6 +171,24 @@ export const updateDNAEntry = (id, data) => api.put(`/api/dna/entries/${id}`, da
 export const getOnboardingStatus = () => api.get('/api/dna/onboarding/status').then((r) => r.data);
 export const updateOnboardingStep = (step) => api.patch('/api/dna/onboarding/step', { step }).then((r) => r.data);
 
+// ── Four Corner Walk (M3a) ───────────────────────────────────────────────────
+
+export const startWalk = () => api.post('/api/walk/start').then((r) => r.data);
+export const endWalk = (sessionId) => api.patch(`/api/walk/${sessionId}/end`).then((r) => r.data);
+export const getActiveWalk = () => api.get('/api/walk/active').then((r) => r.data);
+export const submitEndOfShift = (sessionId, data) => api.post(`/api/walk/${sessionId}/end-of-shift`, data).then((r) => r.data);
+export const getHandover = () => api.get('/api/walk/handover').then((r) => r.data);
+export const getWalkHistory = (params) => api.get('/api/walk/history', { params }).then((r) => r.data);
+
+// ── Corrective Actions (M3a) ─────────────────────────────────────────────────
+
+export const createCorrectiveActionApi = (data) => api.post('/api/corrective', data).then((r) => r.data);
+export const getCorrectiveActions = (params) => api.get('/api/corrective', { params }).then((r) => r.data);
+export const getCorrectiveActionDetail = (id) => api.get(`/api/corrective/${id}`).then((r) => r.data);
+export const takeCorrectiveAction = (id, data) => api.patch(`/api/corrective/${id}/action`, data).then((r) => r.data);
+export const resolveCorrectiveAction = (id, data) => api.patch(`/api/corrective/${id}/resolve`, data).then((r) => r.data);
+export const answerFollowUp = (id, data) => api.patch(`/api/corrective/${id}/follow-up`, data).then((r) => r.data);
+
 // ── Notifications ────────────────────────────────────────────────────────────
 
 /** Fetch recent notifications for logged in user */

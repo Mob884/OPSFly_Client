@@ -8,10 +8,12 @@ import Note from '@/lib/Note';
 import CaptureEvent from '@/lib/CaptureEvent';
 import TenantMemory from '@/lib/TenantMemory';
 import BusinessDNAEntry from '@/lib/BusinessDNAEntry';
+import WalkSession from '@/lib/WalkSession';
 import { authMiddleware } from '@/lib/auth';
 import { analyzeTranscript } from '@/lib/analyzer';
 import { transcribeAudio } from '@/lib/whisper';
 import { getSignedFileUrl, hasAwsCredentials } from '@/lib/storage';
+import { createCorrectiveAction } from '@/lib/correctiveActions';
 
 // Downloads the S3 object at fileKey to a local temp file so the existing
 // Whisper service (which reads from a local filePath) can transcribe it.
@@ -83,6 +85,24 @@ export default async function handler(req, res) {
 
     const analysis = await analyzeTranscript(transcript, user.organizationId);
 
+    // Tag as a walk note if the user has an active Four Corner Walk session.
+    let activeWalk = null;
+    try {
+      activeWalk = await WalkSession.findOne({
+        managerId: user._id,
+        locationId: captureEvent.locationId,
+        status: 'active',
+      });
+      if (activeWalk && activeWalk.timeoutAt && activeWalk.timeoutAt < new Date()) {
+        activeWalk.status = 'timed_out';
+        activeWalk.endedAt = activeWalk.timeoutAt;
+        await activeWalk.save();
+        activeWalk = null;
+      }
+    } catch (e) {
+      console.error('Failed to check active walk session', e);
+    }
+
     const note = await Note.create({
       transcript,
       source,
@@ -92,7 +112,19 @@ export default async function handler(req, res) {
       locationId: captureEvent.locationId,
       organizationId: user.organizationId,
       captureSource: deviceType,
+      walkSessionId: activeWalk?._id || null,
+      isWalkNote: !!activeWalk,
     });
+
+    if (activeWalk) {
+      try {
+        activeWalk.noteIds.push(note._id);
+        activeWalk.noteCount = (activeWalk.noteCount || 0) + 1;
+        await activeWalk.save();
+      } catch (e) {
+        console.error('Failed to tag walk session with new note', e);
+      }
+    }
 
     // Create TenantMemory from saved note (Vault 1) — kept consistent with
     // /api/notes/save's flow, so every note-creation path builds Vault 1
@@ -136,6 +168,32 @@ export default async function handler(req, res) {
       }
     } catch (e) {
       console.error('BusinessDNAEntry auto-creation failed:', e.message);
+    }
+
+    // Auto-track corrective actions for high severity / maintenance issues
+    // (same as notes/save).
+    try {
+      if (note.issues && note.issues.length > 0) {
+        for (const issue of note.issues) {
+          const isHighSeverity = (issue.severityKey || issue.severity || '').toLowerCase() === 'high';
+          const isMaintenance = (issue.categoryKey || issue.type || '').toLowerCase().includes('maint');
+          if (!isHighSeverity && !isMaintenance) continue;
+
+          await createCorrectiveAction({
+            organizationId: note.organizationId,
+            locationId: note.locationId,
+            sourceNoteId: note._id,
+            sourceQuote: issue.quote,
+            sourceTimestamp: note.analyzedAt || note.createdAt,
+            sourceManagerId: user._id,
+            assetId: issue.assetId,
+            vendorId: issue.vendorId,
+            isIncident: (issue.categoryKey || '').toLowerCase() === 'safety' || (issue.categoryKey || '').toLowerCase() === 'incident',
+          });
+        }
+      }
+    } catch (e) {
+      console.error('CorrectiveAction auto-creation failed:', e.message);
     }
 
     captureEvent.processingStatus = 'complete';
