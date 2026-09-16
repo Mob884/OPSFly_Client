@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
+import dotenv from 'dotenv';
+dotenv.config();
 
-const MONGODB_URI = 'mongodb+srv://razishad51_db_user:REDACTED@cluster0.efdzmyb.mongodb.net/?appName=Cluster0';
 const DOWNTOWN_ID = '6a266b384f3000c2eed0584b';
 
 const locationSchema = new mongoose.Schema({ 
@@ -13,7 +14,7 @@ const locationSchema = new mongoose.Schema({
 const Location = mongoose.model('Location', locationSchema);
 
 async function run() {
-  await mongoose.connect(MONGODB_URI);
+  await mongoose.connect(process.env.MONGODB_URI);
   const loc = await Location.findById(DOWNTOWN_ID);
   console.log('BEFORE - isActive:', loc.isActive, 'deleted:', loc.deleted);
   

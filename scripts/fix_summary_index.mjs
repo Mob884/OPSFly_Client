@@ -1,9 +1,9 @@
 import mongoose from 'mongoose';
-
-const MONGODB_URI = 'mongodb+srv://razishad51_db_user:REDACTED@cluster0.efdzmyb.mongodb.net/?appName=Cluster0';
+import dotenv from 'dotenv';
+dotenv.config();
 
 async function run() {
-  await mongoose.connect(MONGODB_URI);
+  await mongoose.connect(process.env.MONGODB_URI);
   const db = mongoose.connection.db;
   
   console.log('=== DailySummaries indexes ===');
