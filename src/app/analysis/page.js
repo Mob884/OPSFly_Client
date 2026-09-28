@@ -6,6 +6,7 @@ import {
   Wrench, Edit2, Trash2, Loader2, ClipboardList
 } from 'lucide-react';
 import Header from '@/src/components/Header';
+import RecallCard from '@/src/components/RecallCard';
 import { saveNote, getAssets, getVendors } from '@/src/services/api';
 import { Link2, Check } from 'lucide-react';
 
@@ -31,6 +32,7 @@ export default function AnalysisPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editedTranscript, setEditedTranscript] = useState('');
   const [savedTasks, setSavedTasks] = useState(null); // null = not saved yet, [] = saved with no tasks
+  const [savedRecall, setSavedRecall] = useState(null);
   const [dnaMatches, setDnaMatches] = useState({}); // { issueIdx: { kind: 'asset'|'vendor', id, name } }
   const [linkedIssues, setLinkedIssues] = useState({}); // { issueIdx: true } — user-confirmed links
 
@@ -89,8 +91,9 @@ export default function AnalysisPage() {
         issues: issuesToSave,
         analyzedAt: analysisData.analyzedAt || new Date(),
       });
-      // Show the auto-created tasks
+      // Show the auto-created tasks (+ any recalled history for this note)
       setSavedTasks(result.tasks || []);
+      setSavedRecall(result.recall || null);
       sessionStorage.removeItem('lastAnalysis');
     } catch (err) {
       console.error('Save failed:', err);
@@ -150,6 +153,12 @@ export default function AnalysisPage() {
                   );
                 })}
               </div>
+            </div>
+          )}
+
+          {savedRecall?.hasHistory && (
+            <div style={{ marginTop: savedTasks.length > 0 ? 16 : 0 }}>
+              <RecallCard recall={savedRecall} />
             </div>
           )}
 
