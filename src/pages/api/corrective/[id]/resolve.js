@@ -1,5 +1,6 @@
 import CorrectiveAction from '@/lib/CorrectiveAction';
 import { requireUser } from '@/lib/apiAuth';
+import { indexResolvedCorrectiveAction } from '@/lib/correctiveActions';
 
 const FOLLOW_UP_DELAY_MS = 48 * 60 * 60 * 1000; // 48 hours
 
@@ -31,6 +32,9 @@ export default async function handler(req, res) {
     action.history.push({ action: 'resolved', performedById: user._id, note: resolutionNote, timestamp: new Date() });
 
     await action.save();
+    indexResolvedCorrectiveAction(action).catch((e) =>
+      console.error('[resolve] Pinecone indexing failed:', e.message)
+    );
     return res.status(200).json(action);
   } catch (error) {
     return res.status(500).json({ error: 'Failed to resolve corrective action', detail: error.message });
