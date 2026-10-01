@@ -203,5 +203,15 @@ export async function markNotificationsAsRead(ids = null) {
   return response.data;
 }
 
+// ── Morning Report (M3B) ─────────────────────────────────────────────────────
+
+export const getMorningReport = () => api.get('/api/report/morning').then((r) => r.data);
+export const getMorningReportHistory = (params) => api.get('/api/report/morning/history', { params }).then((r) => r.data);
+export const regenerateMorningReport = () => api.post('/api/report/morning/generate').then((r) => r.data);
+
+// ── Search (M3B) ──────────────────────────────────────────────────────────────
+
+export const searchAll = (params) => api.get('/api/search', { params }).then((r) => r.data);
+
 export default api;
 

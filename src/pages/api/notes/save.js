@@ -10,6 +10,8 @@ import WalkSession from '@/lib/WalkSession';
 import { authMiddleware } from '@/lib/auth';
 import { verifyLocationAccess } from '@/lib/scopeByLocation';
 import { createCorrectiveAction } from '@/lib/correctiveActions';
+import { upsertMemory } from '@/lib/vectorStore';
+import { recallAtCapture } from '@/lib/recallService';
 
 /**
  * POST /api/notes/save
@@ -82,13 +84,32 @@ export default async function handler(req, res) {
       }
     }
 
+    // Recall at capture — surface prior history for whatever this note just
+    // touched. Must run BEFORE this note's own content is indexed below,
+    // otherwise the note would "recall" itself.
+    let recall = { hasHistory: false, priorIncidents: [], relatedAsset: null, relatedVendor: null, recallSummary: '' };
+    try {
+      const primaryAssetId = issues.map((i) => i.assetId).find(Boolean);
+      const primaryVendorId = issues.map((i) => i.vendorId).find(Boolean);
+      recall = await recallAtCapture(
+        note.organizationId,
+        note.locationId,
+        note.transcript,
+        note.issues || [],
+        primaryAssetId,
+        primaryVendorId
+      );
+    } catch (e) {
+      console.error('Recall at capture failed:', e.message);
+    }
+
     // Create TenantMemory from saved note (Vault 1)
     try {
       const memoryContent = `${note.transcript}. Issues detected: ${
         (note.issues || []).map((i) => `${i.categoryKey || i.type}: ${i.quote}`).join(', ')
       }`;
 
-      await TenantMemory.create({
+      const memory = await TenantMemory.create({
         organizationId: note.organizationId,
         locationId: note.locationId,
         memoryType: 'observation',
@@ -99,6 +120,22 @@ export default async function handler(req, res) {
           tags: (note.issues || []).map((i) => i.categoryKey || i.type),
         },
       });
+
+      try {
+        const embedding = await upsertMemory(note.organizationId, memory._id, memoryContent, {
+          source: 'tenant_memory',
+          type: 'observation',
+          locationId: note.locationId,
+          sourceNoteId: note._id,
+          tags: (note.issues || []).map((i) => i.categoryKey || i.type),
+        });
+        if (embedding) {
+          memory.embedding = embedding;
+          await memory.save();
+        }
+      } catch (e) {
+        console.error('Pinecone indexing failed for note memory:', e.message);
+      }
     } catch (e) {
       // Don't fail note save if memory creation fails
       console.error('TenantMemory creation failed:', e.message);
@@ -109,16 +146,37 @@ export default async function handler(req, res) {
     try {
       if (note.issues && note.issues.length > 0) {
         for (const issue of note.issues) {
-          await BusinessDNAEntry.create({
+          const dnaContent = issue.quote || issue.suggestedTask || note.transcript;
+          const dnaEntry = await BusinessDNAEntry.create({
             organizationId: note.organizationId,
             locationId: note.locationId,
             entryType: 'observation',
             title: `${issue.categoryKey || issue.type || 'general'} observation`,
-            content: issue.quote || issue.suggestedTask || note.transcript,
+            content: dnaContent,
             sourceType: 'voice_note',
             sourceId: note._id,
+            assetId: issue.assetId,
+            vendorId: issue.vendorId,
             tags: [issue.categoryKey || issue.type, issue.severityKey || issue.severity].filter(Boolean),
           });
+
+          try {
+            const embedding = await upsertMemory(note.organizationId, dnaEntry._id, `${dnaEntry.title}. ${dnaContent}`, {
+              source: 'dna_entry',
+              type: 'observation',
+              locationId: note.locationId,
+              assetId: issue.assetId,
+              vendorId: issue.vendorId,
+              sourceNoteId: note._id,
+              tags: dnaEntry.tags,
+            });
+            if (embedding) {
+              dnaEntry.embedding = embedding;
+              await dnaEntry.save();
+            }
+          } catch (e) {
+            console.error('Pinecone indexing failed for DNA observation:', e.message);
+          }
         }
       }
     } catch (e) {
@@ -218,7 +276,7 @@ export default async function handler(req, res) {
       }
     }
 
-    return res.status(201).json({ success: true, note, tasks: createdTasks });
+    return res.status(201).json({ success: true, note, tasks: createdTasks, recall });
   } catch (error) {
     console.error('[POST /api/notes/save]', error);
     return res.status(500).json({ error: 'Save failed', detail: error.message });

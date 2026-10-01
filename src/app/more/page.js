@@ -6,7 +6,7 @@ import { useAuth } from '@/src/context/AuthContext';
 import {
   Settings, LogOut, Shield, User, Bell, AppWindow,
   HelpCircle, Plus, Users, Edit3, MapPin, Loader2, X, PlusCircle,
-  Building2, Briefcase, Calendar, ChevronRight, Lock, Eye, EyeOff, CheckCircle2, AlertTriangle, Dna
+  Building2, Briefcase, Calendar, ChevronRight, Lock, Eye, EyeOff, CheckCircle2, AlertTriangle, Dna, Search
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -486,6 +486,15 @@ export default function MorePage() {
                   <ChevronRight size={16} color="var(--text-muted)" />
                 </button>
               )}
+
+              <button className="settings-menu-item" onClick={() => router.push('/search')}>
+                <Search size={18} color="#00D4FF" />
+                <div style={{ flex: 1, textAlign: 'left' }}>
+                  <span className="settings-menu-title">Search</span>
+                  <span className="settings-menu-desc">Find any note, asset, vendor, or corrective action</span>
+                </div>
+                <ChevronRight size={16} color="var(--text-muted)" />
+              </button>
 
               <button className="settings-menu-item" onClick={() => setActiveSection('profile')}>
                 <User size={18} color="#22C55E" />
