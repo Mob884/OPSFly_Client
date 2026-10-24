@@ -202,6 +202,7 @@ function AddTaskModal({ onClose, onSave, users, userRole }) {
         width: '100%', maxWidth: 430, background: '#0D1520',
         borderRadius: '24px 24px 0 0', padding: '24px 24px 40px',
         border: '1px solid var(--border)',
+        maxHeight: '85vh', overflowY: 'auto',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h3 style={{ fontWeight: 800, fontSize: '1.1rem' }}>Add Task</h3>

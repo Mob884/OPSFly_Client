@@ -148,7 +148,12 @@ export default function Home() {
         getNotes(true),
         getTasks(true)
       ]);
-      setNotes(notesData.slice(0, 5));
+      // "Today's Notes" must only ever show notes from today — filter by
+      // createdAt before slicing, otherwise older notes backfill the list
+      // and appear (with only a time shown) to be from today.
+      const todayStr = new Date().toDateString();
+      const todaysNotes = notesData.filter(n => new Date(n.createdAt).toDateString() === todayStr);
+      setNotes(todaysNotes.slice(0, 5));
       setTasks(tasksData.filter(t => t.status === 'open').slice(0, 3));
       
       getTodaySummary().then(setSummary).catch(() => setSummary(null));
