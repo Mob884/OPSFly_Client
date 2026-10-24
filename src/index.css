@@ -1,8 +1,10 @@
 /* ============================================================
    OpsFly — Premium PWA Design System
    ============================================================ */
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+/* Inter is loaded via next/font/google in layout.js (self-hosted,
+   font-display: swap with fallback metrics) — do not also @import
+   or <link> it here, that caused a double font-load reflow/jolt on
+   first paint. */
 
 :root {
   --bg:            #050B14;
@@ -36,7 +38,7 @@
 
 html, body {
   height: 100%;
-  background-color: #000;
+  background-color: var(--bg);
 }
 
 body {
