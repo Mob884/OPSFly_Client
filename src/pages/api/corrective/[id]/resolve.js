@@ -1,0 +1,42 @@
+import CorrectiveAction from '@/lib/CorrectiveAction';
+import { requireUser } from '@/lib/apiAuth';
+import { indexResolvedCorrectiveAction } from '@/lib/correctiveActions';
+
+const FOLLOW_UP_DELAY_MS = 48 * 60 * 60 * 1000; // 48 hours
+
+/**
+ * PATCH /api/corrective/:id/resolve
+ * Body: { resolutionNote }
+ */
+export default async function handler(req, res) {
+  const user = await requireUser(req, res);
+  if (!user) return;
+  if (req.method !== 'PATCH') return res.status(405).json({ error: 'Method not allowed' });
+
+  try {
+    const { id } = req.query;
+    const action = await CorrectiveAction.findById(id);
+    if (!action) return res.status(404).json({ error: 'Corrective action not found' });
+    if (action.organizationId.toString() !== user.organizationId.toString()) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const { resolutionNote } = req.body || {};
+
+    action.status = 'resolved';
+    action.resolvedAt = new Date();
+    action.resolvedById = user._id;
+    action.resolutionNote = resolutionNote;
+    // Schedule the "still fixed?" follow-up check.
+    if (!action.followUpAt) action.followUpAt = new Date(Date.now() + FOLLOW_UP_DELAY_MS);
+    action.history.push({ action: 'resolved', performedById: user._id, note: resolutionNote, timestamp: new Date() });
+
+    await action.save();
+    indexResolvedCorrectiveAction(action).catch((e) =>
+      console.error('[resolve] Pinecone indexing failed:', e.message)
+    );
+    return res.status(200).json(action);
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to resolve corrective action', detail: error.message });
+  }
+}

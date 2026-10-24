@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Offline — OpsFly</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: #050B14;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+      padding: 24px;
+      text-align: center;
+    }
+    .icon { font-size: 64px; margin-bottom: 24px; }
+    h1 { font-size: 1.5rem; font-weight: 800; margin-bottom: 12px; }
+    p { color: #8B9CB5; font-size: 0.95rem; line-height: 1.6; max-width: 300px; }
+    .badge {
+      margin-top: 32px;
+      background: rgba(29,123,255,0.15);
+      border: 1px solid rgba(29,123,255,0.3);
+      color: #1D7BFF;
+      padding: 8px 20px;
+      border-radius: 100px;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+    button {
+      margin-top: 16px;
+      background: #1D7BFF;
+      color: #fff;
+      border: none;
+      padding: 12px 28px;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+    }
+  </style>
+</head>
+<body>
+  <div class="icon">📡</div>
+  <h1>You're offline</h1>
+  <p>OpsFly needs a connection to sync your notes and tasks. Please check your internet and try again.</p>
+  <div class="badge">OpsFly</div>
+  <button onclick="window.location.reload()">Try Again</button>
+</body>
+</html>
