@@ -88,6 +88,7 @@ export default async function handler(req, res) {
     // touched. Must run BEFORE this note's own content is indexed below,
     // otherwise the note would "recall" itself.
     let recall = { hasHistory: false, priorIncidents: [], relatedAsset: null, relatedVendor: null, recallSummary: '' };
+    const recallStep = async () => {
     try {
       const primaryAssetId = issues.map((i) => i.assetId).find(Boolean);
       const primaryVendorId = issues.map((i) => i.vendorId).find(Boolean);
@@ -102,7 +103,9 @@ export default async function handler(req, res) {
     } catch (e) {
       console.error('Recall at capture failed:', e.message);
     }
+    };
 
+    const memoryStep = async () => {
     // Create TenantMemory from saved note (Vault 1)
     try {
       const memoryContent = `${note.transcript}. Issues detected: ${
@@ -140,12 +143,14 @@ export default async function handler(req, res) {
       // Don't fail note save if memory creation fails
       console.error('TenantMemory creation failed:', e.message);
     }
+    };
 
+    const dnaStep = async () => {
     // Auto-grow Business DNA: every detected observation becomes a
     // BusinessDNAEntry, so the knowledge base grows with each voice note.
     try {
       if (note.issues && note.issues.length > 0) {
-        for (const issue of note.issues) {
+        await Promise.all(note.issues.map(async (issue) => {
           const dnaContent = issue.quote || issue.suggestedTask || note.transcript;
           const dnaEntry = await BusinessDNAEntry.create({
             organizationId: note.organizationId,
@@ -177,12 +182,14 @@ export default async function handler(req, res) {
           } catch (e) {
             console.error('Pinecone indexing failed for DNA observation:', e.message);
           }
-        }
+        }));
       }
     } catch (e) {
       console.error('BusinessDNAEntry auto-creation failed:', e.message);
     }
+    };
 
+    const correctiveStep = async () => {
     // Auto-track corrective actions for anything serious enough to need
     // follow-through — not every note, only high severity or maintenance
     // issues.
@@ -209,7 +216,9 @@ export default async function handler(req, res) {
     } catch (e) {
       console.error('CorrectiveAction auto-creation failed:', e.message);
     }
+    };
 
+    const notifyStep = async () => {
     // Trigger notification: note_added
     try {
       const activeLocUsers = await User.find({
@@ -248,9 +257,11 @@ export default async function handler(req, res) {
     } catch (err) {
       console.error('Failed to create notifications for note', err);
     }
+    };
 
-    // 2. Auto-create tasks from issues (if any) with the creator's userId, locationId, organizationId
     const createdTasks = [];
+    const tasksStep = async () => {
+    // 2. Auto-create tasks from issues (if any) with the creator's userId, locationId, organizationId
     if (issues.length > 0) {
       const dueDate = new Date();
       dueDate.setHours(23, 59, 0, 0);
@@ -275,6 +286,14 @@ export default async function handler(req, res) {
         createdTasks.push(task);
       }
     }
+    };
+
+    // recall must finish before this note is indexed (else it recalls itself);
+    // notifications and tasks do not touch anything recall reads.
+    await Promise.all([recallStep(), notifyStep(), tasksStep()]);
+    // Independent writes: memory + DNA entries + corrective actions (kept
+    // sequential inside, repeat counting depends on prior actions).
+    await Promise.all([memoryStep(), dnaStep(), correctiveStep()]);
 
     return res.status(201).json({ success: true, note, tasks: createdTasks, recall });
   } catch (error) {

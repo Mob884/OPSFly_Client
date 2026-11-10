@@ -2,10 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from "next/link";
 import { useRouter } from 'next/navigation';
-import {
-  Mic, PenLine, Camera, Users, DollarSign, Wrench, AlertTriangle,
-  ClipboardCheck, ChevronRight, Loader2, CalendarDays, ArrowLeft, Building2, TrendingUp, CheckCircle, Clock
-} from 'lucide-react';
+import { Mic, PenLine, Users, DollarSign, Wrench, AlertTriangle, ClipboardCheck, ChevronRight, Loader2, CalendarDays, ArrowLeft, Building2, TrendingUp, CheckCircle, Clock } from 'lucide-react';
 import Header from '@/src/components/Header';
 import OnboardingBanner from '@/src/components/dna/OnboardingBanner';
 import WalkStatusPanel from '@/src/components/walk/WalkStatusPanel';
@@ -426,10 +423,6 @@ export default function Home() {
                         </button>
                       )}
                     </form>
-                  </div>
-                  <div className="input-row" style={{ opacity: 0.4 }}>
-                    <Camera size={20} />
-                    <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>Add Photo (M5)</span>
                   </div>
                 </div>
               </>
