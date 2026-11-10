@@ -11,9 +11,8 @@
 //
 // Usage: node scripts/indexExistingData.js
 
+import 'dotenv/config';
 import mongoose from 'mongoose';
-import dotenv from 'dotenv';
-dotenv.config();
 
 import TenantMemory from '../lib/TenantMemory.js';
 import BusinessDNAEntry from '../lib/BusinessDNAEntry.js';
