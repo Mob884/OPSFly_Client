@@ -230,3 +230,9 @@ export const searchAll = (params) => api.get('/api/search', { params }).then((r)
 
 export default api;
 
+
+
+// ── Apple Watch (M5) ─────────────────────────────────────────────────────────
+export const createWatchPairingCode = () => api.post('/api/watch/pairing-code', {}).then((r) => r.data);
+export const getWatchDevices = () => api.get('/api/watch/devices').then((r) => r.data);
+export const revokeWatchDevice = (id) => api.delete(`/api/watch/devices/${id}`).then((r) => r.data);

@@ -3,11 +3,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/src/components/Header';
 import { useAuth } from '@/src/context/AuthContext';
-import {
-  Settings, LogOut, Shield, User, Bell, AppWindow,
-  HelpCircle, Plus, Users, Edit3, MapPin, Loader2, X, PlusCircle,
-  Building2, Briefcase, Calendar, ChevronRight, Lock, Eye, EyeOff, CheckCircle2, AlertTriangle, Dna, Search
-} from 'lucide-react';
+import { Settings, LogOut, Shield, User, Bell, AppWindow, HelpCircle, Plus, Users, Edit3, MapPin, Loader2, X, PlusCircle, Building2, Briefcase, Calendar, ChevronRight, Lock, Eye, EyeOff, CheckCircle2, AlertTriangle, Dna, Search, Watch } from 'lucide-react';
 import axios from 'axios';
 
 export default function MorePage() {
@@ -492,6 +488,15 @@ export default function MorePage() {
                 <div style={{ flex: 1, textAlign: 'left' }}>
                   <span className="settings-menu-title">Search</span>
                   <span className="settings-menu-desc">Find any note, asset, vendor, or corrective action</span>
+                </div>
+                <ChevronRight size={16} color="var(--text-muted)" />
+              </button>
+
+              <button className="settings-menu-item" onClick={() => router.push('/watch')}>
+                <Watch size={18} color="#A78BFA" />
+                <div style={{ flex: 1, textAlign: 'left' }}>
+                  <span className="settings-menu-title">Apple Watch</span>
+                  <span className="settings-menu-desc">Pair a watch to dictate notes from your wrist</span>
                 </div>
                 <ChevronRight size={16} color="var(--text-muted)" />
               </button>
