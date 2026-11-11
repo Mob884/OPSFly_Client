@@ -12,6 +12,43 @@ import { verifyLocationAccess } from '@/lib/scopeByLocation';
 import { createCorrectiveAction } from '@/lib/correctiveActions';
 import { upsertMemory } from '@/lib/vectorStore';
 import { recallAtCapture } from '@/lib/recallService';
+import Asset from '@/lib/Asset';
+import Vendor from '@/lib/Vendor';
+import { validateFileOwnership } from '@/lib/storage';
+
+const CAPTURE_SOURCES = ['mobile_ios', 'mobile_android', 'web', 'apple_watch', 'wearable'];
+const IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/webp'];
+
+/**
+ * M5: validates photos sent with a note. A photo is only accepted if its
+ * fileKey lives under the caller's own organization prefix (tenant isolation),
+ * and linked equipment / vendor ids must belong to that organization too.
+ */
+async function resolveMedia(raw, organizationId) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  for (const m of raw.slice(0, 5)) {
+    if (!m || typeof m.fileKey !== 'string' || !validateFileOwnership(m.fileKey, organizationId)) continue;
+    if (!IMAGE_MIMES.includes(m.mimeType)) continue;
+    const [asset, vendor] = await Promise.all([
+      m.linkedAssetId ? Asset.findOne({ _id: m.linkedAssetId, organizationId }).select('_id physicalLocation').lean().catch(() => null) : null,
+      m.linkedVendorId ? Vendor.findOne({ _id: m.linkedVendorId, organizationId }).select('_id').lean().catch(() => null) : null,
+    ]);
+    out.push({
+      fileKey: m.fileKey,
+      fileType: 'image',
+      mimeType: m.mimeType,
+      uploadedAt: new Date(),
+      aiAnalysis: typeof m.aiAnalysis === 'string' ? m.aiAnalysis.slice(0, 1500) : '',
+      equipmentHint: typeof m.equipmentHint === 'string' ? m.equipmentHint.slice(0, 200) : '',
+      tags: Array.isArray(m.tags) ? m.tags.map(String).slice(0, 8) : [],
+      linkedAssetId: asset?._id,
+      linkedVendorId: vendor?._id,
+      area: asset?.physicalLocation || undefined,
+    });
+  }
+  return out;
+}
 
 /**
  * POST /api/notes/save
@@ -36,7 +73,26 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'This location is inactive and cannot accept new notes.' });
     }
 
-    const { transcript, source, issues = [], analyzedAt } = req.body;
+    const { transcript: rawTranscript, source, issues: rawIssues = [], analyzedAt, mediaFiles: rawMedia, captureSource } = req.body;
+    let transcript = rawTranscript;
+    let issues = rawIssues;
+
+    const mediaFiles = await resolveMedia(rawMedia, organizationId);
+    // A photo-only note falls back to the Vision description as its text.
+    if (!transcript?.trim() && mediaFiles.length) {
+      const text = mediaFiles.map((m) => m.aiAnalysis).filter(Boolean).join(' ');
+      if (text) transcript = `Photo: ${text}`;
+    }
+    // Issues found by Vision are linked to the photo's equipment / vendor automatically.
+    const photoLink = mediaFiles.find((m) => m.linkedAssetId || m.linkedVendorId);
+    if (photoLink) {
+      issues = issues.map((i) =>
+        i && i.fromPhoto ? { ...i, assetId: i.assetId || photoLink.linkedAssetId, vendorId: i.vendorId || photoLink.linkedVendorId } : i
+      );
+    }
+    const photoText = mediaFiles.length
+      ? ` Photo: ${mediaFiles.map((m) => [m.aiAnalysis, m.equipmentHint].filter(Boolean).join(' - ')).filter(Boolean).join('; ')}.`
+      : '';
 
     if (!transcript?.trim()) {
       return res.status(400).json({ error: 'transcript is required' });
@@ -65,6 +121,8 @@ export default async function handler(req, res) {
     const note = await Note.create({
       transcript: transcript.trim(),
       source: source || 'voice',
+      mediaFiles,
+      captureSource: CAPTURE_SOURCES.includes(captureSource) ? captureSource : 'web',
       issues,
       analyzedAt: analyzedAt || new Date(),
       userId: decoded.userId,
@@ -110,7 +168,7 @@ export default async function handler(req, res) {
     try {
       const memoryContent = `${note.transcript}. Issues detected: ${
         (note.issues || []).map((i) => `${i.categoryKey || i.type}: ${i.quote}`).join(', ')
-      }`;
+      }.${photoText}`;
 
       const memory = await TenantMemory.create({
         organizationId: note.organizationId,
@@ -121,6 +179,10 @@ export default async function handler(req, res) {
           sourceNoteId: note._id,
           captureSource: note.captureSource,
           tags: (note.issues || []).map((i) => i.categoryKey || i.type),
+          assetId: photoLink?.linkedAssetId,
+          vendorId: photoLink?.linkedVendorId,
+          hasPhoto: mediaFiles.length > 0,
+          photoFileKeys: mediaFiles.map((m) => m.fileKey),
         },
       });
 

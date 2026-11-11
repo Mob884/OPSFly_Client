@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Search, Loader2, Calendar, Trash2, FileText, X, CheckSquare, Square } from 'lucide-react';
 import Header from '@/src/components/Header';
 import { getNotes, deleteNote, invalidateNotesCache } from '@/src/services/api';
+import NotePhoto from '@/src/components/NotePhoto';
 import { useAuth } from '@/src/context/AuthContext';
 
 const SEVERITY_COLORS = {
@@ -269,6 +270,7 @@ export default function NotesPage() {
                   </div>
 
                   {/* Transcript */}
+                  <NotePhoto note={note} />
                   <p style={{ fontSize: '0.9rem', lineHeight: 1.6, color: '#fff', marginBottom: note.issues?.length > 0 ? 10 : 0 }}>
                     {note.transcript}
                   </p>

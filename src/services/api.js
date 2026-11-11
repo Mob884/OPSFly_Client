@@ -30,6 +30,21 @@ export async function analyzeNote(transcript) {
   return response.data;
 }
 
+/** M5: upload a (compressed) photo, have Vision AI read it with the note text, auto-link it to Business DNA */
+export async function analyzePhoto(file, transcript = '') {
+  const form = new FormData();
+  form.append('file', file, 'photo.jpg');
+  if (transcript) form.append('transcript', transcript);
+  const response = await api.post('/api/notes/analyze-photo', form, { timeout: 60000 });
+  return response.data;
+}
+
+/** M5: short-lived signed URL for a stored photo (org-scoped on the server) */
+export async function getSignedFileUrl(fileKey) {
+  const response = await api.get(`/api/upload/signed-url/${fileKey}`);
+  return response.data.signedUrl;
+}
+
 /** Save note — also invalidates notes + tasks cache (tasks may be created) */
 export async function saveNote(data) {
   const response = await api.post('/api/notes/save', data);

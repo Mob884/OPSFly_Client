@@ -7,6 +7,8 @@ import Header from '@/src/components/Header';
 import OnboardingBanner from '@/src/components/dna/OnboardingBanner';
 import WalkStatusPanel from '@/src/components/walk/WalkStatusPanel';
 import MorningReportPanel from '@/src/components/MorningReportPanel';
+import PhotoAttach from '@/src/components/PhotoAttach';
+import { attachPhotoToAnalysis, getPendingPhoto } from '@/src/services/photoStore';
 import { getNotes, getTasks, analyzeNote, getTodaySummary } from '@/src/services/api';
 import { useAuth } from '@/src/context/AuthContext';
 import axios from 'axios';
@@ -44,6 +46,7 @@ export default function Home() {
   const [textNote, setTextNote] = useState('');
   const [loading, setLoading] = useState(true);
   const [isAnalyzingText, setIsAnalyzingText] = useState(false);
+  const [hasPhoto, setHasPhoto] = useState(false);
 
   // Overview Aggregate Data
   const [overviewData, setOverviewData] = useState([]);
@@ -177,16 +180,20 @@ export default function Home() {
 
   const handleTextSubmit = async (e) => {
     if (e) e.preventDefault();
-    if (!textNote.trim() || isAnalyzingText) return;
+    const hasText = !!textNote.trim();
+    if ((!hasText && !getPendingPhoto()) || isAnalyzingText) return;
     setIsAnalyzingText(true);
+    const source = hasText ? 'text' : 'photo';
     try {
-      const result = await analyzeNote(textNote);
-      const analysisData = { transcript: textNote, source: 'text', issues: result.issues, analyzedAt: new Date() };
+      // A photo-only note skips text analysis; Vision AI reads the photo alone.
+      const result = hasText ? await analyzeNote(textNote) : { issues: [] };
+      const analysisData = await attachPhotoToAnalysis({ transcript: textNote, source, issues: result.issues, analyzedAt: new Date() });
       sessionStorage.setItem('lastAnalysis', JSON.stringify(analysisData));
       router.push('/analysis');
       setTextNote('');
+      setHasPhoto(false);
     } catch (err) {
-      const fallbackData = { transcript: textNote, source: 'text', issues: [] };
+      const fallbackData = await attachPhotoToAnalysis({ transcript: textNote, source, issues: [] });
       sessionStorage.setItem('lastAnalysis', JSON.stringify(fallbackData));
       router.push('/analysis');
     } finally {
@@ -412,7 +419,7 @@ export default function Home() {
                         id="text-input" placeholder={isAnalyzingText ? "Analyzing..." : "Type a note..."}
                         className="home-text-input" value={textNote} onChange={(e) => setTextNote(e.target.value)} disabled={isAnalyzingText}
                       />
-                      {textNote.trim() && !isAnalyzingText && (
+                      {(textNote.trim() || hasPhoto) && !isAnalyzingText && (
                         <button type="submit" style={{
                           background: 'var(--primary)', border: 'none',
                           width: '28px', height: '28px', borderRadius: '50%',
@@ -424,6 +431,7 @@ export default function Home() {
                       )}
                     </form>
                   </div>
+                  <PhotoAttach className="input-row" disabled={isAnalyzingText} onChange={setHasPhoto} />
                 </div>
               </>
             )}

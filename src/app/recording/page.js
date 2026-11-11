@@ -6,6 +6,8 @@ import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognitio
 import { Mic, Square, Loader2, AlertCircle } from 'lucide-react';
 import Header from '@/src/components/Header';
 import { analyzeNote } from '@/src/services/api';
+import PhotoAttach from '@/src/components/PhotoAttach';
+import { attachPhotoToAnalysis } from '@/src/services/photoStore';
 
 export default function RecordingPage() {
   const router = useRouter();
@@ -63,12 +65,12 @@ export default function RecordingPage() {
     const finalTranscript = transcript?.trim() || "(No speech detected.)";
     try {
       const result = await analyzeNote(finalTranscript);
-      const data = { transcript: finalTranscript, source: 'voice', issues: result.issues || [], analyzedAt: new Date() };
+      const data = await attachPhotoToAnalysis({ transcript: finalTranscript, source: 'voice', issues: result.issues || [], analyzedAt: new Date() });
       sessionStorage.setItem('lastAnalysis', JSON.stringify(data));
       router.push('/analysis');
     } catch (err) {
       console.error('Analysis failed:', err);
-      const data = { transcript: finalTranscript, source: 'voice', issues: [] };
+      const data = await attachPhotoToAnalysis({ transcript: finalTranscript, source: 'voice', issues: [] });
       sessionStorage.setItem('lastAnalysis', JSON.stringify(data));
       router.push('/analysis');
     }
@@ -86,6 +88,13 @@ export default function RecordingPage() {
     <>
       <Header showBack title="Recording" />
       <main className="recording-page">
+
+        {/* M5: attach a photo to this observation while recording */}
+        {(phase === 'idle' || phase === 'recording') && (
+          <div style={{ display: 'flex', justifyContent: 'center', margin: '0 0 16px' }}>
+            <PhotoAttach />
+          </div>
+        )}
 
         {/* ── Status indicator ── */}
         {phase === 'idle' && (

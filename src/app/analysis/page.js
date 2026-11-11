@@ -8,7 +8,7 @@ import {
 import Header from '@/src/components/Header';
 import RecallCard from '@/src/components/RecallCard';
 import { saveNote, getAssets, getVendors } from '@/src/services/api';
-import { Link2, Check } from 'lucide-react';
+import { Link2, Check, Camera } from 'lucide-react';
 
 const SEVERITY_COLOR = { high: '#EF4444', medium: '#FF8A00', low: '#22C55E' };
 
@@ -41,7 +41,7 @@ export default function AnalysisPage() {
     if (data) {
       const parsed = JSON.parse(data);
       setAnalysisData(parsed);
-      setEditedTranscript(parsed.transcript);
+      setEditedTranscript(parsed.transcript || (parsed.photo?.analysis?.description ? `Photo: ${parsed.photo.analysis.description}` : ''));
     } else {
       router.push('/');
     }
@@ -66,7 +66,19 @@ export default function AnalysisPage() {
           const vendor = (vendors || []).find((v) => words.some((w) => (v.category || '').toLowerCase().includes(w)));
           if (vendor) matches[idx] = { kind: 'vendor', id: vendor._id, name: vendor.name };
         });
+        // M5: issues Vision AI found in the photo are linked to the photo's
+        // equipment / vendor automatically (the manager can still un-link).
+        const link = analysisData.photo?.link;
+        const auto = {};
+        if (link) {
+          analysisData.issues.forEach((issue, idx) => {
+            if (!issue.fromPhoto) return;
+            if (link.assetId) { matches[idx] = { kind: 'asset', id: link.assetId, name: link.assetName }; auto[idx] = true; }
+            else if (link.vendorId) { matches[idx] = { kind: 'vendor', id: link.vendorId, name: link.vendorName }; auto[idx] = true; }
+          });
+        }
         setDnaMatches(matches);
+        if (Object.keys(auto).length) setLinkedIssues((prev) => ({ ...auto, ...prev }));
       } catch {
         // DNA linking is a nice-to-have — never block the save flow on it.
       }
@@ -76,6 +88,8 @@ export default function AnalysisPage() {
   if (!analysisData) return null;
 
   const { issues = [] } = analysisData;
+  const photoSrc = analysisData.photo?.previewUrl
+    || (analysisData.photo?.signedUrl && !analysisData.photo.signedUrl.includes('mock-storage') ? analysisData.photo.signedUrl : null);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -88,8 +102,20 @@ export default function AnalysisPage() {
       const result = await saveNote({
         transcript: editedTranscript,
         source: analysisData.source || 'voice',
+        captureSource: 'web',
         issues: issuesToSave,
         analyzedAt: analysisData.analyzedAt || new Date(),
+        mediaFiles: analysisData.photo
+          ? [{
+              fileKey: analysisData.photo.fileKey,
+              mimeType: analysisData.photo.mimeType,
+              aiAnalysis: analysisData.photo.analysis?.description || '',
+              equipmentHint: analysisData.photo.analysis?.equipmentHint || '',
+              tags: analysisData.photo.analysis?.tags || [],
+              linkedAssetId: analysisData.photo.link?.assetId || undefined,
+              linkedVendorId: analysisData.photo.link?.vendorId || undefined,
+            }]
+          : undefined,
       });
       // Show the auto-created tasks (+ any recalled history for this note)
       setSavedTasks(result.tasks || []);
@@ -198,6 +224,33 @@ export default function AnalysisPage() {
           </div>
         </div>
 
+        {/* M5: attached photo + what Vision AI saw */}
+        {analysisData.photo && (
+          <div className="transcript-card" style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+            {photoSrc ? (
+              <img src={photoSrc} alt="Attached" style={{ width: 84, height: 84, borderRadius: 12, objectFit: 'cover', flexShrink: 0 }} />
+            ) : null}
+            <div style={{ flex: 1 }}>
+              <div className="transcript-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Camera size={13} /> Photo analysis</div>
+              <p className="transcript-text" style={{ fontSize: '0.9rem' }}>
+                {analysisData.photo.analysis?.description || 'The photo is attached. AI analysis is not available right now.'}
+              </p>
+              {(analysisData.photo.link?.assetName || analysisData.photo.link?.vendorName || analysisData.photo.link?.area) && (
+                <div style={{ marginTop: 8, fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {analysisData.photo.link?.assetName && <span style={{ padding: '3px 8px', borderRadius: 999, background: 'rgba(34,197,94,0.12)' }}>Equipment: {analysisData.photo.link.assetName}</span>}
+                  {analysisData.photo.link?.vendorName && <span style={{ padding: '3px 8px', borderRadius: 999, background: 'rgba(29,123,255,0.12)' }}>Vendor: {analysisData.photo.link.vendorName}</span>}
+                  {analysisData.photo.link?.area && <span style={{ padding: '3px 8px', borderRadius: 999, background: 'rgba(255,255,255,0.06)' }}>Area: {analysisData.photo.link.area}</span>}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        {analysisData.photoError && (
+          <div style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(239,68,68,0.1)', color: '#EF4444', fontSize: '0.82rem' }}>
+            {analysisData.photoError}
+          </div>
+        )}
+
         {/* Transcript card */}
         <div className="transcript-card">
           <div className="transcript-label">Transcript</div>
@@ -238,6 +291,7 @@ export default function AnalysisPage() {
                         {getIssueIcon(issue.type)}
                       </div>
                       <span style={{ fontWeight: 700, fontSize: '0.95rem', flex: 1 }}>{issue.type}</span>
+                      {issue.fromPhoto && <span title="Found in the photo" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.68rem', color: 'var(--text-secondary)' }}><Camera size={12} /> Photo</span>}
                       <span style={{
                         fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase',
                         padding: '3px 8px', borderRadius: 4,
