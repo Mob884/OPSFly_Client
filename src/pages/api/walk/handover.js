@@ -28,16 +28,19 @@ export default async function handler(req, res) {
 
     if (!handover) return res.status(200).json(null);
 
-    // Capture the pre-fetch read state: the response always reflects
-    // isRead:true after this call (we mark it read below), so the client
-    // needs `wasUnread` to know whether to surface the card THIS load —
-    // showing it once on discovery, not on every subsequent Home load.
-    const wasUnread = !handover.isRead;
+    // Per-user read tracking. The recap is for the incoming manager, so the
+    // manager who ended the shift never consumes it, and one person opening
+    // it does not hide it from the next. `wasUnread` is true once per user.
+    const userId = String(decoded.userId);
+    const isOutgoing = handover.outgoingManagerId && String(handover.outgoingManagerId) === userId;
+    const alreadyRead = (handover.readBy || []).some((id) => String(id) === userId);
+    const wasUnread = !isOutgoing && !alreadyRead;
 
     if (wasUnread) {
-      handover.isRead = true;
-      handover.readAt = new Date();
-      await handover.save();
+      await ShiftHandover.updateOne(
+        { _id: handover._id },
+        { $addToSet: { readBy: decoded.userId }, $set: { isRead: true, readAt: new Date() } }
+      );
     }
 
     const result = handover.toObject();
